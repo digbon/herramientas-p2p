@@ -7,6 +7,10 @@ export function Balance() {
   const store = useAppStore();
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
+  const [isInitialBalanceModalOpen, setIsInitialBalanceModalOpen] = useState(false);
+  
+  const [newCurrency, setNewCurrency] = useState('');
+  const [newCurrencyType, setNewCurrencyType] = useState<'Fiat' | 'Crypto'>('Fiat');
 
   const getSaldoActual = (accountId: string) => {
     const account = store.accounts.find(a => a.id === accountId);
@@ -178,10 +182,126 @@ export function Balance() {
            </p>
         </div>
 
+        <div className="mt-8 pt-8 border-t border-slate-800 space-y-6">
+          <h2 className="text-xl font-bold text-white">Configuración de Balances</h2>
+
+          <SectionCard title="Configuración de Visualización de Divisas">
+            <div className="space-y-4">
+              <div className="space-y-1 relative">
+                <label className="text-xs text-slate-400">Etiqueta para tu Moneda Fiat (Local)</label>
+                <select
+                  value={store.baseFiat}
+                  onChange={(e) => store.setBaseFiat(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500"
+                >
+                  {store.currencies.filter(c => c.type === 'Fiat').map(c => (
+                    <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
+                  ))}
+                  {!store.currencies.find(c => c.symbol === store.baseFiat && c.type === 'Fiat') && store.baseFiat && (
+                    <option value={store.baseFiat}>{store.baseFiat}</option>
+                  )}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
+              </div>
+              <div className="space-y-1 relative">
+                <label className="text-xs text-slate-400">Etiqueta para tu Criptomoneda Principal</label>
+                <select
+                  value={store.baseCrypto}
+                  onChange={(e) => store.setBaseCrypto(e.target.value)}
+                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500"
+                >
+                  {store.currencies.filter(c => c.type === 'Crypto').map(c => (
+                    <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
+                  ))}
+                  {!store.currencies.find(c => c.symbol === store.baseCrypto && c.type === 'Crypto') && store.baseCrypto && (
+                    <option value={store.baseCrypto}>{store.baseCrypto}</option>
+                  )}
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed text-center !mt-4">
+                Estas etiquetas se usarán para mostrar tus saldos y operaciones.
+              </p>
+            </div>
+          </SectionCard>
+          
+          <SectionCard title="Saldo Inicial">
+            <div className="space-y-2 text-sm text-slate-300 mb-4">
+              {store.currencies.map(c => (
+                  <div key={c.symbol}>Balance {c.symbol} Inicial: <span className="font-semibold text-white">{c.type === 'Fiat' ? getFiatBalance(c.symbol).toFixed(2) : getCryptoBalance(c.symbol).toFixed(2)}</span></div>
+              ))}
+            </div>
+            <button onClick={() => setIsInitialBalanceModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
+              Modificar Saldo Inicial
+            </button>
+          </SectionCard>
+
+          <SectionCard title="Mis Monedas">
+            <p className="text-xs text-slate-400 mb-4">
+              Cada moneda lleva una etiqueta (fiat o cripto) y aparece como opción al crear operaciones. Puedes combinar cualquier par: BOB - USDT, USD - ARS.
+            </p>
+            <div className="space-y-2 mb-4">
+              {store.currencies.map(c => (
+                <div key={c.symbol} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                  <span className="font-semibold text-white min-w-[50px]">{c.symbol}</span>
+                  {(c.symbol === store.baseCrypto || c.symbol === store.baseFiat) && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">PRINCIPAL</span>}
+                  <div className="flex-1" />
+                  <div className="relative">
+                    <select 
+                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-sm text-slate-300 outline-none appearance-none pr-7"
+                        value={c.type}
+                        disabled
+                      >
+                      <option>Fiat</option>
+                      <option>Crypto</option>
+                    </select>
+                    <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  {!(c.symbol === store.baseCrypto || c.symbol === store.baseFiat) && (
+                    <button onClick={() => store.removeCurrency(c.symbol)} className="p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded"><X className="w-4 h-4" /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Ej: ARS, ETH, USDC" 
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 uppercase"
+                  value={newCurrency}
+                  onChange={e => setNewCurrency(e.target.value.toUpperCase())}
+                />
+                <div className="relative">
+                  <select 
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-8 py-2 text-sm text-white outline-none focus:border-blue-500 appearance-none"
+                    value={newCurrencyType}
+                    onChange={e => setNewCurrencyType(e.target.value as 'Fiat' | 'Crypto')}
+                  >
+                    <option value="Fiat">Fiat</option>
+                    <option value="Crypto">Crypto</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <button 
+                  onClick={() => {
+                    if(newCurrency && !store.currencies.find(c => c.symbol === newCurrency)) {
+                      store.addCurrency({ symbol: newCurrency, type: newCurrencyType });
+                      setNewCurrency('');
+                    }
+                  }}
+                  className="w-10 h-10 bg-blue-600 hover:bg-blue-700 flex items-center justify-center rounded-lg text-white"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+            </div>
+          </SectionCard>
+        </div>
+
       </div>
 
       {isDepositOpen && <CapitalModal type="Deposit" onClose={() => setIsDepositOpen(false)} />}
       {isWithdrawOpen && <CapitalModal type="Withdrawal" onClose={() => setIsWithdrawOpen(false)} />}
+      {isInitialBalanceModalOpen && <InitialBalanceModal onClose={() => setIsInitialBalanceModalOpen(false)} />}
     </div>
   );
 }
@@ -302,5 +422,105 @@ function EditInitialBalance({ account }: { account: any }) {
        <span className="font-bold text-base text-white">{account.initialBalance.toFixed(2)}</span>
        <Pencil className="w-3.5 h-3.5 text-slate-500" />
     </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-4">
+      <h2 className="text-sm font-semibold mb-4 text-slate-200">
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+function InitialBalanceModal({ onClose }: { onClose: () => void }) {
+  const store = useAppStore();
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center justify-center pointer-events-none sm:p-4">
+         <div className="bg-slate-950 pointer-events-auto sm:border border-t border-slate-800 w-full max-w-md max-h-[90vh] sm:max-h-[85vh] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-300">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900 shrink-0">
+              <h2 className="text-lg font-bold text-white">Modificar Saldo Inicial</h2>
+              <button onClick={onClose} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 touch-pan-y">
+               <p className="text-sm text-slate-400">
+                 Configura el saldo inicial de cada cuenta. Puedes agregar más cuentas o monedas con el botón "+".
+               </p>
+               
+               {store.accounts.map((acc) => (
+                  <div key={acc.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+                     <div className="flex items-center gap-3">
+                       <div className="flex-1 space-y-1 relative">
+                         <label className="text-xs text-slate-400">Moneda</label>
+                         <select 
+                           value={acc.currency} 
+                           onChange={(e) => store.updateAccount(acc.id, { currency: e.target.value })}
+                           className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none outline-none focus:border-blue-500"
+                         >
+                           {store.currencies.map(c => <option key={c.symbol} value={c.symbol}>{c.symbol}</option>)}
+                         </select>
+                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
+                       </div>
+                       <button onClick={() => {
+                          store.removeAccount(acc.id);
+                       }} className="mt-5 w-12 h-12 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-lg text-slate-500 hover:text-red-500 shrink-0">
+                         <X className="w-5 h-5" />
+                       </button>
+                     </div>
+
+                     <div className="space-y-1 text-xs">
+                       <label className="text-slate-400">Nombre de la Cuenta</label>
+                       <input 
+                         type="text" 
+                         value={acc.name} 
+                         onChange={(e) => store.updateAccount(acc.id, { name: e.target.value })}
+                         placeholder="Ej: Cuenta 1, Binance, BCP..."
+                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 text-base" 
+                       />
+                     </div>
+                     
+                     <div className="space-y-1 text-xs">
+                       <label className="text-slate-400">Saldo inicial ({acc.currency})</label>
+                       <input 
+                         type="number" 
+                         value={acc.initialBalance} 
+                         onChange={(e) => store.updateAccountInitialBalance(acc.id, parseFloat(e.target.value) || 0)}
+                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 text-base font-bold" 
+                       />
+                       {acc.currency === store.baseCrypto && (
+                         <p className="text-[10px] text-slate-500 mt-1">Esta es tu moneda principal. Aparecerá destacada en el encabezado.</p>
+                       )}
+                     </div>
+                  </div>
+               ))}
+
+               <button onClick={() => {
+                  const defaultCurrency = store.currencies[0]?.symbol || 'USDT';
+                  const counts = store.accounts.filter(a => a.currency === defaultCurrency).length;
+                  store.addAccount({ id: Date.now().toString(), currency: defaultCurrency, name: `Cuenta ${counts + 1}`, initialBalance: 0 });
+               }} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:text-white hover:border-slate-700 hover:bg-slate-900 transition-colors flex items-center justify-center gap-2">
+                  <Plus className="w-5 h-5" /> Agregar Cuenta
+               </button>
+               
+            </div>
+
+            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-800 bg-slate-900 shrink-0">
+               <button onClick={onClose} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-colors">
+                 Listo
+               </button>
+            </div>
+
+         </div>
+      </div>
+    </>
   );
 }

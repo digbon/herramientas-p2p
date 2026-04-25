@@ -3,7 +3,7 @@ import { Settings2, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function Simulator() {
-  const [activeTab, setActiveTab] = useState('Basico');
+  const [activeTab, setActiveTab] = useState('Básico');
   const [amountUSDT, setAmountUSDT] = useState('100');
   const [buyPrice, setBuyPrice] = useState('9.42');
   const [buyFee, setBuyFee] = useState('0.1');
