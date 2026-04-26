@@ -71,17 +71,17 @@ export type Operation = {
   type: 'Compra' | 'Venta';
   order: 'Maker' | 'Taker';
   sourceCurrency: string;
-  sourceAccountId: string;
-  sourcePlatformId?: string;
-  clientDestAccountId?: string;
+  sourceMyPlatformId?: string;
+  sourceMyAccountId?: string;
+  sourceClientPlatformId?: string;
+  sourceClientAccountId?: string;
   destCurrency: string;
-  destAccountId: string;
-  destPlatformId?: string;
-  clientSourceAccountId?: string;
+  destMyPlatformId?: string;
+  destMyAccountId?: string;
+  destClientPlatformId?: string;
+  destClientAccountId?: string;
   counterpartName: string;
   counterpartContact?: string;
-  myPlatformId?: string;
-  clientPlatformId?: string;
   amountSent: number;
   price: number;
   amountReceived: number;
@@ -90,6 +90,13 @@ export type Operation = {
   notes?: string;
   date: string;
   attachments?: Attachment[];
+  // Keep older fields for compatibility if needed, but we'll focus on the new ones
+  sourceAccountId?: string;
+  sourcePlatformId?: string;
+  clientDestAccountId?: string;
+  destAccountId?: string;
+  destPlatformId?: string;
+  clientSourceAccountId?: string;
 };
 
 export type Transfer = {

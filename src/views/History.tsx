@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, X, ChevronDown, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { NewOperation } from './NewOperation';
+import { getAccountBalance } from '../lib/balance';
+import { PlatformPicker } from '../components/PlatformPicker';
+import { OwnerNamePicker } from '../components/OwnerNamePicker';
 
 export function History() {
   const store = useAppStore();
   const [timeFilter, setTimeFilter] = useState('Global');
   const [listTab, setListTab] = useState('Operaciones');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showClientAccountModal, setShowClientAccountModal] = useState(false);
+  const [editingClientAccountId, setEditingClientAccountId] = useState<string | null>(null);
+
+  const clientAccounts = store.accounts.filter(a => a.ownerType === 'Cliente');
 
   return (
     <div className="space-y-4 pb-16">
@@ -48,11 +55,12 @@ export function History() {
 
       <div>
         <div className="flex border-b border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-hide">
-           {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias'].map((tab) => {
+           {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias', 'Clientes'].map((tab) => {
             const count = tab === 'Operaciones' ? store.operations.length 
               : tab === 'Depósitos' ? store.movements.filter(m => m.type === 'Deposit').length
               : tab === 'Retiros' ? store.movements.filter(m => m.type === 'Withdrawal').length
-              : store.transfers.length;
+              : tab === 'Transferencias' ? store.transfers.length
+              : store.accounts.filter(a => a.ownerType === 'Cliente').length;
              
             return (
               <button
@@ -73,8 +81,80 @@ export function History() {
           {listTab === 'Depósitos' && store.movements.filter(m => m.type === 'Deposit').length === 0 && "No hay depósitos en el período seleccionado."}
           {listTab === 'Retiros' && store.movements.filter(m => m.type === 'Withdrawal').length === 0 && "No hay retiros en el período seleccionado."}
           {listTab === 'Transferencias' && store.transfers.length === 0 && "No hay transferencias en el período seleccionado."}
+          {listTab === 'Clientes' && clientAccounts.length === 0 && (
+            <div className="py-20 flex flex-col items-center justify-center text-center px-6">
+              <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center mb-4">
+                <User className="w-8 h-8 text-slate-600" />
+              </div>
+              <h3 className="text-white font-bold mb-2">No hay clientes aún</h3>
+              <p className="text-xs text-slate-500 mb-6 max-w-[200px]">Registra aquí a tus clientes para llevar un historial ordenado.</p>
+              <button 
+                onClick={() => {
+                  setEditingClientAccountId(null);
+                  setShowClientAccountModal(true);
+                }}
+                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
+              >
+                Registrar Primer Cliente
+              </button>
+            </div>
+          )}
           
           <div className="space-y-3">
+             {listTab === 'Clientes' && clientAccounts.length > 0 && (
+               <div className="space-y-3">
+                 <div className="flex justify-between items-center px-1">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{clientAccounts.length} Clientes Totales</span>
+                   <button 
+                    onClick={() => {
+                      setEditingClientAccountId(null);
+                      setShowClientAccountModal(true);
+                    }}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors"
+                   >
+                     <Plus className="w-3 h-3" /> Añadir Nuevo
+                   </button>
+                 </div>
+                 {clientAccounts.map(acc => {
+                   const platform = store.platforms.find(p => p.id === acc.platformId);
+                   return (
+                     <div 
+                      key={acc.id} 
+                      onClick={() => {
+                        setEditingClientAccountId(acc.id);
+                        setShowClientAccountModal(true);
+                      }}
+                      className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3 hover:border-slate-700 transition-colors cursor-pointer group"
+                     >
+                       <div className="mt-1 p-2 rounded-full shrink-0 bg-teal-500/20 text-teal-500 group-hover:bg-teal-500/30 transition-colors">
+                         <User className="w-4 h-4" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <div className="flex justify-between items-start mb-1">
+                           <div className="font-bold text-white truncate group-hover:text-teal-400 transition-colors">{acc.ownerName}</div>
+                           <div className="text-[10px] font-black bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-widest">{acc.currency}</div>
+                         </div>
+                         <div className="text-xs text-slate-400 mb-2">
+                           {platform?.name} - {acc.name} {acc.platformValue && <span className="font-mono opacity-60">({acc.platformValue})</span>}
+                         </div>
+                         <div className="flex justify-end items-center text-xs">
+                           <Trash2 
+                             className="w-3.5 h-3.5 text-slate-700 hover:text-rose-500 transition-colors" 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               if (confirm('¿Eliminar esta cuenta de cliente?')) {
+                                 store.removeAccount(acc.id);
+                               }
+                             }}
+                           />
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })}
+               </div>
+             )}
+
              {listTab === 'Transferencias' && store.transfers.map(t => {
                 const sourceAcc = store.accounts.find(a => a.id === t.sourceAccountId);
                 const destAcc = store.accounts.find(a => a.id === t.destAccountId);
@@ -123,37 +203,81 @@ export function History() {
                 );
              })}
 
-             {listTab === 'Operaciones' && store.operations.map(op => (
-                <div key={op.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
-                  <div className={cn("mt-1 p-2 rounded-full shrink-0", op.type === 'Compra' ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500")}>
-                    {op.type === 'Compra' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+             {listTab === 'Operaciones' && store.operations.map(op => {
+                const sMyPlatform = store.platforms.find(p => p.id === op.sourceMyPlatformId);
+                const sMyAccount = store.accounts.find(a => a.id === op.sourceMyAccountId);
+                const sClientPlatform = store.platforms.find(p => p.id === op.sourceClientPlatformId);
+                const sClientAccount = store.accounts.find(a => a.id === op.sourceClientAccountId);
+
+                const dMyPlatform = store.platforms.find(p => p.id === op.destMyPlatformId);
+                const dMyAccount = store.accounts.find(a => a.id === op.destMyAccountId);
+                const dClientPlatform = store.platforms.find(p => p.id === op.destClientPlatformId);
+                const dClientAccount = store.accounts.find(a => a.id === op.destClientAccountId);
+
+                return (
+                  <div key={op.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
+                    <div className={cn("mt-1 p-2 rounded-full shrink-0", op.type === 'Compra' ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500")}>
+                      {op.type === 'Compra' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="font-semibold text-white truncate">{op.counterpartName}</div>
+                        <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
+                          {format(new Date(op.date), 'dd/MM/yyyy HH:mm')}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-baseline mb-2">
+                         <span className={cn("text-xs px-1.5 py-0.5 rounded font-medium", op.type === 'Compra' ? "bg-emerald-500/20 text-emerald-400" : "bg-purple-500/20 text-purple-400")}>
+                           {op.type}
+                         </span>
+                         <span className="font-bold text-white">{op.price} <span className="text-slate-500 font-normal text-xs">{op.sourceCurrency}/{op.destCurrency}</span></span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400 bg-slate-950 p-2 rounded-lg border border-slate-800/50">
+                          <div className="space-y-1">
+                            <div className="font-black text-[9px] uppercase tracking-tighter text-red-500/70 border-b border-red-950 mb-1">Entregaste ({op.sourceCurrency})</div>
+                            <div className="text-white font-bold text-sm mb-1">{op.amountSent} <span className="text-slate-500 text-[10px]">{op.sourceCurrency}</span></div>
+                            
+                            {(sMyAccount || sMyPlatform) && (
+                              <div className="flex flex-col gap-0.5 opacity-80">
+                                <span className="text-slate-500 text-[9px] uppercase font-bold">Mías:</span>
+                                <span className="text-slate-300 truncate">{sMyPlatform?.name} {sMyAccount && `- ${sMyAccount.name}`}</span>
+                              </div>
+                            )}
+
+                            {(sClientAccount || sClientPlatform) && (
+                              <div className="flex flex-col gap-0.5 opacity-80">
+                                <span className="text-slate-500 text-[9px] uppercase font-bold">Cliente:</span>
+                                <span className="text-slate-300 truncate">{sClientPlatform?.name} {sClientAccount && `- ${sClientAccount.name}`}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 text-right">
+                            <div className="font-black text-[9px] uppercase tracking-tighter text-emerald-500/70 border-b border-emerald-950 mb-1">Recibiste ({op.destCurrency})</div>
+                            <div className="text-white font-bold text-sm mb-1">{op.amountReceived} <span className="text-slate-500 text-[10px]">{op.destCurrency}</span></div>
+                            
+                            {(dMyAccount || dMyPlatform) && (
+                              <div className="flex flex-col gap-0.5 opacity-80 items-end text-right">
+                                <span className="text-slate-500 text-[9px] uppercase font-bold">Mías:</span>
+                                <span className="text-slate-300 truncate">{dMyPlatform?.name} {dMyAccount && `- ${dMyAccount.name}`}</span>
+                              </div>
+                            )}
+
+                            {(dClientAccount || dClientPlatform) && (
+                              <div className="flex flex-col gap-0.5 opacity-80 items-end text-right">
+                                <span className="text-slate-500 text-[9px] uppercase font-bold">Cliente:</span>
+                                <span className="text-slate-300 truncate">{dClientPlatform?.name} {dClientAccount && `- ${dClientAccount.name}`}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="font-semibold text-white truncate">{op.counterpartName}</div>
-                      <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
-                        {format(new Date(op.date), 'dd/MM/yyyy HH:mm')}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-baseline mb-2">
-                       <span className={cn("text-xs px-1.5 py-0.5 rounded font-medium", op.type === 'Compra' ? "bg-emerald-500/20 text-emerald-400" : "bg-purple-500/20 text-purple-400")}>
-                         {op.type}
-                       </span>
-                       <span className="font-bold text-white">{op.price} <span className="text-slate-500 font-normal text-xs">{op.sourceCurrency}/{op.destCurrency}</span></span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-400 bg-slate-950 p-2 rounded-lg">
-                      <div>
-                        <div className="mb-0.5">Entregaste</div>
-                        <div className="text-white font-medium">{op.amountSent} {op.sourceCurrency}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="mb-0.5">Recibiste</div>
-                        <div className="text-white font-medium">{op.amountReceived} {op.destCurrency}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {(listTab === 'Depósitos' || listTab === 'Retiros') && store.movements.filter(m => m.type === (listTab === 'Depósitos' ? 'Deposit' : 'Withdrawal')).map(m => (
                  <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
@@ -186,6 +310,117 @@ export function History() {
       </button>
 
       {isModalOpen && <NewOperation onClose={() => setIsModalOpen(false)} />}
+      
+      {showClientAccountModal && (
+        <ClientAccountModal 
+          accountId={editingClientAccountId}
+          onClose={() => {
+            setShowClientAccountModal(false);
+            setEditingClientAccountId(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ClientAccountModal({ accountId, onClose }: { accountId: string | null, onClose: () => void }) {
+  const store = useAppStore();
+  const account = accountId ? store.accounts.find(a => a.id === accountId) : null;
+  
+  const [name, setName] = useState(account?.name || '');
+  const [tag, setTag] = useState(account?.tag || '');
+  const [ownerName, setOwnerName] = useState(account?.ownerName || '');
+  const [currency, setCurrency] = useState(account?.currency || store.baseFiat);
+  const [platformId, setPlatformId] = useState(account?.platformId || '');
+  const [platformValue, setPlatformValue] = useState(account?.platformValue || '');
+  const [initialBalance, setInitialBalance] = useState(account?.initialBalance?.toString() || '0');
+
+  const handleSave = () => {
+    const data = {
+      id: accountId || Date.now().toString(),
+      name,
+      tag: tag || `#${store.accounts.filter(a => a.currency === currency).length + 1}`,
+      ownerName,
+      ownerType: 'Cliente' as const,
+      currency,
+      platformId,
+      platformValue,
+      initialBalance: parseFloat(initialBalance) || 0,
+    };
+
+    if (accountId) {
+      store.updateAccount(accountId, data);
+    } else {
+      store.addAccount(data);
+    }
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100]" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-[100] flex sm:items-center justify-center pointer-events-none p-4">
+        <div className="bg-slate-950 pointer-events-auto border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+             <h3 className="text-white font-black text-xs uppercase tracking-widest">{accountId ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
+             <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+          </div>
+          <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+             <div className="space-y-1 text-[10px]">
+                <label className="text-slate-500 font-bold uppercase">Nombre Completo del Cliente</label>
+                <OwnerNamePicker 
+                  value={ownerName} 
+                  ownerType="Cliente"
+                  onSelect={setOwnerName}
+                />
+             </div>
+
+             <div className="grid grid-cols-2 gap-3">
+               <div className="space-y-1 text-[10px]">
+                  <label className="text-slate-500 font-bold uppercase">Moneda</label>
+                  <select 
+                    value={currency} 
+                    onChange={e => setCurrency(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-bold appearance-none"
+                  >
+                    {store.currencies.map(c => <option key={c.symbol} value={c.symbol}>{c.symbol}</option>)}
+                  </select>
+               </div>
+               <div className="space-y-1 text-[10px]">
+                  <label className="text-slate-500 font-bold uppercase">Nombre Cuenta</label>
+                  <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="Ej: BCP" className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-bold" />
+               </div>
+             </div>
+
+             <div className="space-y-1 text-[10px]">
+                <label className="text-slate-500 font-bold uppercase">Plataforma / Banco</label>
+                <PlatformPicker 
+                  value={platformId}
+                  ownerFilter="Cliente"
+                  onSelect={(id, val) => {
+                    setPlatformId(id);
+                    if (val) setPlatformValue(val);
+                  }}
+                  onAddNew={() => {}} // No implementation here for simplicity
+                />
+             </div>
+
+             <div className="space-y-1 text-[10px]">
+                <label className="text-slate-500 font-bold uppercase">ID / Número de Cuenta</label>
+                <input value={platformValue} onChange={e => setPlatformValue(e.target.value)} type="text" placeholder="ID, número de cuenta, etc." className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-mono" />
+             </div>
+
+             <button 
+              disabled={!ownerName || !platformId} 
+              onClick={handleSave} 
+              className="w-full bg-blue-600 disabled:opacity-50 text-white rounded-xl py-3.5 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-900/20 active:scale-95 transition-all mt-4"
+             >
+               {accountId ? 'Guardar Cambios' : 'Registrar Cliente'}
+             </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

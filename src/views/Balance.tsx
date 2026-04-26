@@ -107,7 +107,7 @@ export function Balance() {
 
         <div className="space-y-6">
           {store.currencies.map(currency => {
-             const accounts = store.accounts.filter(a => a.currency === currency.symbol);
+             const accounts = store.accounts.filter(a => a.currency === currency.symbol && a.ownerType === 'Mias');
              
              return (
                <div key={currency.symbol} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
@@ -160,7 +160,7 @@ export function Balance() {
                                  "text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
                                  acc.ownerType === 'Mias' ? "bg-purple-500/10 text-purple-400" : "bg-teal-500/10 text-teal-400"
                                )}>
-                                 {acc.ownerType === 'Mias' ? 'Mi' : 'Cliente'}
+                                 {acc.ownerType === 'Mias' ? 'Mía' : 'Cliente'}
                                </span>
                                <span className="text-white font-bold text-sm tracking-tight">{acc.ownerName}</span>
                              </div>
@@ -345,12 +345,14 @@ function EditAccountModal({ account, onClose, isNew = false }: { account: Accoun
   const [name, setName] = useState(account.name);
   const [tag, setTag] = useState(account.tag || '');
   const [ownerName, setOwnerName] = useState(account.ownerName || '');
-  const [ownerType, setOwnerType] = useState<'Mias' | 'Cliente'>(account.ownerType || 'Mias');
+  const [ownerType] = useState<'Mias' | 'Cliente'>('Mias');
   const [platformId, setPlatformId] = useState(account.platformId || '');
   const [platformValue, setPlatformValue] = useState(account.platformValue || '');
   const [initialBalance, setInitialBalance] = useState(account.initialBalance.toString());
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(account.paymentMethods || []);
   const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
+  const [showPlatformAccountModal, setShowPlatformAccountModal] = useState<{ platformId: string; accountIndex?: number; isLegacy?: boolean } | null>(null);
+  const [editingPlatformId, setEditingPlatformId] = useState<string | undefined>(undefined);
 
   const handleSave = () => {
     if (isNew) {
@@ -435,32 +437,17 @@ function EditAccountModal({ account, onClose, isNew = false }: { account: Accoun
               </div>
             )}
 
-            <div className={cn("space-y-4 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 transition-all", !isNew && "opacity-50 grayscale")}>
+            <div className={cn("space-y-4 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 transition-all")}>
               <div className="flex items-center gap-4">
-                 <button 
-                   onClick={() => isNew && setOwnerType('Mias')}
-                   disabled={!isNew}
-                   className={cn(
-                     "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                     ownerType === 'Mias' ? "bg-purple-600 text-white shadow-lg shadow-purple-900/20" : "bg-slate-800 text-slate-500 hover:bg-slate-700",
-                     !isNew && "cursor-not-allowed"
-                   )}
-                 >Mía</button>
-                 <button 
-                   onClick={() => isNew && setOwnerType('Cliente')}
-                   disabled={!isNew}
-                   className={cn(
-                     "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                     ownerType === 'Cliente' ? "bg-teal-600 text-white shadow-lg shadow-teal-900/20" : "bg-slate-800 text-slate-500 hover:bg-slate-700",
-                     !isNew && "cursor-not-allowed"
-                   )}
-                 >Cliente</button>
+                 <div className="flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-purple-600 text-white shadow-lg shadow-purple-900/20 text-center">
+                   Cuenta Propia (Mía)
+                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre Completo del Dueño</label>
                 <OwnerNamePicker 
                   value={ownerName} 
-                  ownerType={ownerType}
+                  ownerType="Mias"
                   onSelect={setOwnerName}
                   disabled={!isNew}
                 />
@@ -482,6 +469,31 @@ function EditAccountModal({ account, onClose, isNew = false }: { account: Accoun
                       setPlatformId(pId);
                       if (accVal) setPlatformValue(accVal);
                     }}
+                    onAddNew={() => {
+                      setEditingPlatformId(undefined);
+                      setShowAddPlatformModal(true);
+                    }}
+                    onAddAccountToPlatform={(id) => {
+                      setShowPlatformAccountModal({ platformId: id });
+                    }}
+                    onEditAccount={(pId, idx, isLegacy) => {
+                      setShowPlatformAccountModal({ platformId: pId, accountIndex: idx, isLegacy });
+                    }}
+                    onDeleteAccount={(pId, idx, isLegacy) => {
+                      const platform = store.platforms.find(p => p.id === pId);
+                      if (!platform) return;
+                      
+                      if (isLegacy) {
+                        store.updatePlatform(pId, { details: undefined });
+                      } else if (platform.accounts) {
+                        const newAccounts = platform.accounts.filter((_, i) => i !== idx);
+                        store.updatePlatform(pId, { accounts: newAccounts });
+                      }
+                    }}
+                    onDeletePlatform={(id) => {
+                      store.removePlatform(id);
+                      if (platformId === id) setPlatformId('');
+                    }}
                   />
                 </div>
                 {platformId && (
@@ -500,14 +512,6 @@ function EditAccountModal({ account, onClose, isNew = false }: { account: Accoun
                     />
                   </div>
                 )}
-                {isNew && (
-                  <button 
-                    onClick={() => setShowAddPlatformModal(true)}
-                    className="w-full py-2 border border-dashed border-slate-800 rounded-xl text-[10px] font-bold text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-all uppercase tracking-widest"
-                  >
-                    + Nueva Plataforma a la lista
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -522,18 +526,123 @@ function EditAccountModal({ account, onClose, isNew = false }: { account: Accoun
       {showAddPlatformModal && (
         <MiniAddPlatformModal 
           store={store}
+          platformId={editingPlatformId}
           onAdd={() => setShowAddPlatformModal(false)}
           onClose={() => setShowAddPlatformModal(false)}
           ownerFilter={ownerType}
+        />
+      )}
+
+      {showPlatformAccountModal && (
+        <PlatformAccountModal 
+          store={store}
+          platformId={showPlatformAccountModal.platformId}
+          accountIndex={showPlatformAccountModal.accountIndex}
+          isLegacy={showPlatformAccountModal.isLegacy}
+          onClose={() => setShowPlatformAccountModal(null)}
         />
       )}
     </>
   );
 }
 
-function MiniAddPlatformModal({ onAdd, onClose, store, ownerFilter }: { onAdd: (id: string) => void, onClose: () => void, store: any, ownerFilter?: string }) {
-  const [type, setType] = useState<'Fiat' | 'Crypto'>('Fiat');
-  const [name, setName] = useState('');
+function PlatformAccountModal({ 
+  store, 
+  platformId, 
+  accountIndex, 
+  isLegacy, 
+  onClose 
+}: { 
+  store: any, 
+  platformId: string, 
+  accountIndex?: number, 
+  isLegacy?: boolean,
+  onClose: () => void 
+}) {
+  const platform = store.platforms.find((p: any) => p.id === platformId);
+  const isEditing = accountIndex !== undefined || isLegacy;
+  
+  let initialValue = '';
+  let initialLabel = '';
+  
+  if (isLegacy) {
+    initialValue = platform.details || '';
+    initialLabel = 'Principal';
+  } else if (accountIndex !== undefined && platform.accounts) {
+    initialValue = platform.accounts[accountIndex].value;
+    initialLabel = platform.accounts[accountIndex].label || '';
+  }
+
+  const [value, setValue] = useState(initialValue);
+  const [label, setLabel] = useState(initialLabel);
+
+  const handleSave = () => {
+    if (!value) return;
+    
+    if (isLegacy) {
+      store.updatePlatform(platformId, { details: value });
+    } else {
+      const newAccounts = [...(platform.accounts || [])];
+      if (accountIndex !== undefined) {
+        newAccounts[accountIndex] = { ...newAccounts[accountIndex], value, label };
+      } else {
+        newAccounts.push({ id: Date.now().toString(), value, label });
+      }
+      store.updatePlatform(platformId, { accounts: newAccounts });
+    }
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[110]" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-[110] flex sm:items-center justify-center pointer-events-none p-4">
+        <div className="bg-slate-950 pointer-events-auto border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+             <h3 className="text-white font-black text-xs uppercase tracking-widest">
+               {isEditing ? 'Editar Cuenta' : 'Nueva Cuenta'}
+             </h3>
+             <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+          </div>
+          <div className="p-5 space-y-4">
+             <div className="space-y-1 text-xs">
+                <label className="text-slate-500 font-bold uppercase tracking-tighter">Alias / Etiqueta (Ej: Principal, Ahorros)</label>
+                <input 
+                  value={label} 
+                  onChange={e => setLabel(e.target.value)} 
+                  type="text" 
+                  placeholder="Ej: Ahorros..." 
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500" 
+                />
+             </div>
+             <div className="space-y-1 text-xs">
+                <label className="text-slate-500 font-bold uppercase tracking-tighter">Número / ID / Alias en plataforma</label>
+                <input 
+                  value={value} 
+                  onChange={e => setValue(e.target.value)} 
+                  type="text" 
+                  placeholder="Ej: 78979555..." 
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 font-mono" 
+                />
+             </div>
+             <button 
+              disabled={!value} 
+              onClick={handleSave}
+              className="w-full bg-blue-600 disabled:opacity-50 text-white rounded-xl py-3.5 font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-600/20 active:scale-95 transition-all mt-2"
+             >
+               {isEditing ? 'Actualizar Cuenta' : 'Guardar Cuenta'}
+             </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function MiniAddPlatformModal({ onAdd, onClose, store, ownerFilter, platformId }: { onAdd: (id: string) => void, onClose: () => void, store: any, ownerFilter?: string, platformId?: string }) {
+  const platformToEdit = platformId ? store.platforms.find((p: any) => p.id === platformId) : null;
+  const [type, setType] = useState<'Fiat' | 'Crypto'>(platformToEdit?.type || 'Fiat');
+  const [name, setName] = useState(platformToEdit?.name || '');
 
   return (
     <>
@@ -541,7 +650,7 @@ function MiniAddPlatformModal({ onAdd, onClose, store, ownerFilter }: { onAdd: (
       <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-[100] flex sm:items-center justify-center pointer-events-none p-4">
         <div className="bg-slate-950 pointer-events-auto border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-             <h3 className="text-white font-black text-xs uppercase tracking-widest">Nueva Plataforma</h3>
+             <h3 className="text-white font-black text-xs uppercase tracking-widest">{platformId ? 'Editar Plataforma' : 'Nueva Plataforma'}</h3>
              <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
           </div>
           <div className="p-5 space-y-4">
@@ -559,13 +668,18 @@ function MiniAddPlatformModal({ onAdd, onClose, store, ownerFilter }: { onAdd: (
              <button 
               disabled={!name} 
               onClick={() => {
-                const id = Date.now().toString();
-                store.addPlatform({ id, type, name, owner: ownerFilter || 'Mias' });
-                onAdd(id);
+                if (platformId) {
+                  store.updatePlatform(platformId, { type, name });
+                  onAdd(platformId);
+                } else {
+                  const id = Date.now().toString();
+                  store.addPlatform({ id, type, name, owner: ownerFilter || 'Mias', accounts: [] });
+                  onAdd(id);
+                }
               }} 
               className="w-full bg-emerald-600 disabled:opacity-50 text-white rounded-xl py-3.5 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 active:scale-95 transition-all mt-2"
              >
-               Registrar Plataforma
+               {platformId ? 'Actualizar Plataforma' : 'Registrar Plataforma'}
              </button>
           </div>
         </div>

@@ -23,7 +23,7 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans pb-20">
       <div className="max-w-md mx-auto min-h-screen relative bg-slate-950 sm:border-x sm:border-slate-800 flex flex-col shadow-2xl">
         <header className="flex items-center gap-3 px-4 py-3 border-b border-slate-800 bg-slate-900/50">
-          <Logo className="w-8 h-8 drop-shadow-sm" />
+          <Logo className="drop-shadow-sm" />
           <h1 className="font-bold tracking-tight text-white">Herramientas P2P</h1>
         </header>
 
