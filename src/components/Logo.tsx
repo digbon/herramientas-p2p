@@ -1,21 +1,15 @@
 import React from 'react';
 import { cn } from '../lib/utils';
-import logoUrl from '../assets/Logo.svg';
+import { Wallet } from 'lucide-react';
 
-interface LogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface LogoProps {
   className?: string;
 }
 
-export function Logo({ className, ...props }: LogoProps) {
+export function Logo({ className }: LogoProps) {
   return (
-    <div className={cn("bg-white rounded-full p-0.5 flex items-center justify-center shadow-md w-12 h-12 shrink-0", className)}>
-      <img
-        src={logoUrl}
-        alt="Logo"
-        className="w-full h-full object-contain"
-        referrerPolicy="no-referrer"
-        {...props}
-      />
+    <div className={cn("bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20 w-12 h-12 shrink-0", className)}>
+      <Wallet className="w-8 h-8 text-white" />
     </div>
   );
 }

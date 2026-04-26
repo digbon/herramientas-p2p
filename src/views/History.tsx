@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, X, ChevronDown, Trash2 } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, X, ChevronDown, Trash2, Wallet } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { NewOperation } from './NewOperation';
 import { getAccountBalance } from '../lib/balance';
 import { PlatformPicker } from '../components/PlatformPicker';
 import { OwnerNamePicker } from '../components/OwnerNamePicker';
+import { PlatformAccordion } from '../components/PlatformAccordion';
+import { ClientDetail } from '../components/ClientDetail';
 
 export function History() {
   const store = useAppStore();
@@ -15,11 +17,44 @@ export function History() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
   const [editingClientAccountId, setEditingClientAccountId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const clientAccounts = store.accounts.filter(a => a.ownerType === 'Cliente');
+  
+  // Create a list of unique clients based on the store.clients and current accounts (for backward compatibility)
+  const uniqueClients = React.useMemo(() => {
+    const clients = [...store.clients];
+    const accountClients = store.accounts
+      .filter(a => a.ownerType === 'Cliente')
+      .map(a => a.ownerName);
+    
+    accountClients.forEach(name => {
+      if (!clients.find(c => c.name === name)) {
+        clients.push({
+          id: `legacy-${name}`,
+          name: name,
+          createdAt: new Date().toISOString()
+        });
+      }
+    });
+    return clients;
+  }, [store.clients, store.accounts]);
+
+  const filteredClients = uniqueClients.filter(c => 
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-4 pb-16">
+      {/* Client Detail Modal */}
+      {selectedClientId && (
+        <ClientDetail 
+          clientId={selectedClientId} 
+          onClose={() => setSelectedClientId(null)} 
+        />
+      )}
+
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <h1 className="text-xl font-bold">Historial</h1>
       </div>
@@ -45,6 +80,8 @@ export function History() {
           <input 
             type="text"
             placeholder="Buscar nombre, plataforma, notas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -54,24 +91,31 @@ export function History() {
       </div>
 
       <div>
-        <div className="flex border-b border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-hide">
-           {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias', 'Clientes'].map((tab) => {
+        <div className="flex gap-4 border-b border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-hide px-4">
+           {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias', 'Clientes', 'Plataformas'].map((tab) => {
             const count = tab === 'Operaciones' ? store.operations.length 
               : tab === 'Depósitos' ? store.movements.filter(m => m.type === 'Deposit').length
               : tab === 'Retiros' ? store.movements.filter(m => m.type === 'Withdrawal').length
               : tab === 'Transferencias' ? store.transfers.length
-              : store.accounts.filter(a => a.ownerType === 'Cliente').length;
+              : tab === 'Clientes' ? store.clients.length
+              : store.platforms.filter(p => p.owner === 'Cliente').length;
              
             return (
               <button
                 key={tab}
                 onClick={() => setListTab(tab)}
                 className={cn(
-                  "flex-1 py-3 text-sm font-medium transition-colors border-b-2",
-                  listTab === tab ? "border-blue-500 text-blue-500" : "border-transparent text-slate-400 hover:text-slate-300"
+                  "flex flex-col items-center gap-1 px-2 py-3 text-sm font-bold transition-all border-b-2 min-w-[80px]",
+                  listTab === tab ? "border-blue-500 text-blue-500" : "border-transparent text-slate-500 hover:text-slate-300"
                 )}
               >
-                {tab} ({count})
+                <span className="text-[10px] uppercase tracking-wider">{tab}</span>
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-full border",
+                  listTab === tab ? "bg-blue-600 text-white border-blue-500" : "bg-slate-900 border-slate-800 text-slate-500"
+                )}>
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -81,77 +125,63 @@ export function History() {
           {listTab === 'Depósitos' && store.movements.filter(m => m.type === 'Deposit').length === 0 && "No hay depósitos en el período seleccionado."}
           {listTab === 'Retiros' && store.movements.filter(m => m.type === 'Withdrawal').length === 0 && "No hay retiros en el período seleccionado."}
           {listTab === 'Transferencias' && store.transfers.length === 0 && "No hay transferencias en el período seleccionado."}
-          {listTab === 'Clientes' && clientAccounts.length === 0 && (
+          {listTab === 'Plataformas' && store.platforms.filter(p => p.owner === 'Cliente').length === 0 && "No hay plataformas de clientes registradas."}
+          {listTab === 'Clientes' && store.clients.length === 0 && (
             <div className="py-20 flex flex-col items-center justify-center text-center px-6">
               <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center mb-4">
-                <User className="w-8 h-8 text-slate-600" />
+                <User className="w-8 h-8 text-slate-700" />
               </div>
               <h3 className="text-white font-bold mb-2">No hay clientes aún</h3>
-              <p className="text-xs text-slate-500 mb-6 max-w-[200px]">Registra aquí a tus clientes para llevar un historial ordenado.</p>
-              <button 
-                onClick={() => {
-                  setEditingClientAccountId(null);
-                  setShowClientAccountModal(true);
-                }}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
-              >
-                Registrar Primer Cliente
-              </button>
+              <p className="text-xs text-slate-500 mb-6 max-w-[200px]">Los clientes se registran automáticamente cuando realizas una operación con ellos.</p>
             </div>
           )}
           
           <div className="space-y-3">
-             {listTab === 'Clientes' && clientAccounts.length > 0 && (
+             {listTab === 'Plataformas' && (
+               <div className="text-left space-y-4">
+                 <div className="px-1 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <Wallet className="w-3.5 h-3.5 text-blue-500" />
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Plataformas de Clientes</span>
+                    </div>
+                 </div>
+                 <div className="space-y-3">
+                   {store.platforms.filter(p => p.owner === 'Cliente').map(platform => (
+                     <PlatformAccordion key={platform.id} platform={platform} />
+                   ))}
+                 </div>
+               </div>
+             )}
+
+             {listTab === 'Clientes' && filteredClients.length > 0 && (
                <div className="space-y-3">
                  <div className="flex justify-between items-center px-1">
-                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{clientAccounts.length} Clientes Totales</span>
-                   <button 
-                    onClick={() => {
-                      setEditingClientAccountId(null);
-                      setShowClientAccountModal(true);
-                    }}
-                    className="flex items-center gap-1.5 text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors"
-                   >
-                     <Plus className="w-3 h-3" /> Añadir Nuevo
-                   </button>
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{filteredClients.length} Clientes Registrados</span>
                  </div>
-                 {clientAccounts.map(acc => {
-                   const platform = store.platforms.find(p => p.id === acc.platformId);
-                   return (
-                     <div 
-                      key={acc.id} 
-                      onClick={() => {
-                        setEditingClientAccountId(acc.id);
-                        setShowClientAccountModal(true);
-                      }}
-                      className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3 hover:border-slate-700 transition-colors cursor-pointer group"
-                     >
-                       <div className="mt-1 p-2 rounded-full shrink-0 bg-teal-500/20 text-teal-500 group-hover:bg-teal-500/30 transition-colors">
-                         <User className="w-4 h-4" />
+                 <div className="grid gap-2">
+                   {filteredClients.map(client => {
+                     const accountsCount = store.accounts.filter(a => a.ownerName === client.name && a.ownerType === 'Cliente').length;
+                     return (
+                       <div 
+                        key={client.id} 
+                        onClick={() => setSelectedClientId(client.id)}
+                        className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-center gap-3 hover:border-slate-700 transition-colors cursor-pointer group"
+                       >
+                         <div className="p-2 rounded-full shrink-0 bg-teal-500/20 text-teal-500 group-hover:bg-teal-500/30 transition-colors">
+                           <User className="w-4 h-4" />
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <div className="flex justify-between items-center">
+                             <div className="font-bold text-white truncate group-hover:text-teal-400 transition-colors">{client.name}</div>
+                             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{accountsCount} Cuentas</div>
+                           </div>
+                           {client.contact && <div className="text-[10px] text-slate-500 mt-0.5">{client.contact}</div>}
+                         </div>
+                         <ChevronDown className="w-4 h-4 text-slate-700 -rotate-90" />
                        </div>
-                       <div className="flex-1 min-w-0">
-                         <div className="flex justify-between items-start mb-1">
-                           <div className="font-bold text-white truncate group-hover:text-teal-400 transition-colors">{acc.ownerName}</div>
-                           <div className="text-[10px] font-black bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-widest">{acc.currency}</div>
-                         </div>
-                         <div className="text-xs text-slate-400 mb-2">
-                           {platform?.name} - {acc.name} {acc.platformValue && <span className="font-mono opacity-60">({acc.platformValue})</span>}
-                         </div>
-                         <div className="flex justify-end items-center text-xs">
-                           <Trash2 
-                             className="w-3.5 h-3.5 text-slate-700 hover:text-rose-500 transition-colors" 
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               if (confirm('¿Eliminar esta cuenta de cliente?')) {
-                                 store.removeAccount(acc.id);
-                               }
-                             }}
-                           />
-                         </div>
-                       </div>
-                     </div>
-                   );
-                 })}
+                     );
+                   })}
+                 </div>
                </div>
              )}
 
@@ -173,8 +203,21 @@ export function History() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-semibold text-white truncate">Transferencia</div>
-                        <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
-                          {format(new Date(t.date), 'dd/MM/yyyy HH:mm')}
+                        <div className="flex items-center gap-2">
+                          <div className="text-[10px] text-slate-500 whitespace-nowrap">
+                            {format(new Date(t.date), 'dd/MM/yy HH:mm')}
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('¿Eliminar transferencia?')) {
+                                store.importData({ transfers: store.transfers.filter(tr => tr.id !== t.id) });
+                              }
+                            }}
+                            className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-center mb-3">
@@ -222,8 +265,21 @@ export function History() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1">
                         <div className="font-semibold text-white truncate">{op.counterpartName}</div>
-                        <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
-                          {format(new Date(op.date), 'dd/MM/yyyy HH:mm')}
+                        <div className="flex items-center gap-2">
+                          <div className="text-[10px] text-slate-500 whitespace-nowrap">
+                            {format(new Date(op.date), 'dd/MM/yy HH:mm')}
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('¿Eliminar operación?')) {
+                                store.importData({ operations: store.operations.filter(o => o.id !== op.id) });
+                              }
+                            }}
+                            className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-baseline mb-2">
@@ -287,8 +343,21 @@ export function History() {
                    <div className="flex-1 min-w-0">
                      <div className="flex justify-between items-start mb-1">
                        <div className="font-semibold text-white truncate">{m.type === 'Deposit' ? 'Depósito' : 'Retiro'}</div>
-                       <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
-                         {format(new Date(m.date), 'dd/MM/yyyy HH:mm')}
+                       <div className="flex items-center gap-2">
+                         <div className="text-[10px] text-slate-500 whitespace-nowrap">
+                           {format(new Date(m.date), 'dd/MM/yy HH:mm')}
+                         </div>
+                         <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`¿Eliminar ${m.type === 'Deposit' ? 'depósito' : 'retiro'}?`)) {
+                                store.importData({ movements: store.movements.filter(mov => mov.id !== m.id) });
+                              }
+                            }}
+                            className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                        </div>
                      </div>
                      <div className="flex justify-between items-baseline mb-2">

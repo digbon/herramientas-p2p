@@ -109,11 +109,19 @@ export type Transfer = {
   notes?: string;
 };
 
+export type Client = {
+  id: string;
+  name: string;
+  contact?: string;
+  createdAt: string;
+};
+
 export type AppState = {
   baseFiat: string;
   baseCrypto: string;
   currencies: Currency[];
   accounts: Account[];
+  clients: Client[];
   platforms: Platform[];
   operations: Operation[];
   movements: Movement[];
@@ -126,6 +134,8 @@ export type AppState = {
   updateAccountInitialBalance: (id: string, balance: number) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
   removeAccount: (id: string) => void;
+  addClient: (client: Client) => void;
+  updateClient: (id: string, updates: Partial<Client>) => void;
   addPlatform: (platform: Platform) => void;
   updatePlatform: (id: string, updates: Partial<Platform>) => void;
   removePlatform: (id: string) => void;
@@ -154,6 +164,7 @@ export const useAppStore = create<AppState>()(
         { id: '3', currency: 'BOB', tag: '#1', name: 'Ahorros BCP', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 950, platformId: '2' },
         { id: '4', currency: 'BTC', tag: '#1', name: 'Binance BTC', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 0.00123, platformId: '3' },
       ],
+      clients: [],
       platforms: [
         { id: '1', owner: 'Mias', type: 'Fiat', name: 'YapeBolivia', details: '78979555' },
         { id: '2', owner: 'Mias', type: 'Fiat', name: 'BCP' },
@@ -175,6 +186,10 @@ export const useAppStore = create<AppState>()(
         accounts: state.accounts.map(a => a.id === id ? { ...a, ...updates } : a)
       })),
       removeAccount: (id) => set((state) => ({ accounts: state.accounts.filter(a => a.id !== id) })),
+      addClient: (client) => set((state) => ({ clients: [...state.clients, client] })),
+      updateClient: (id, updates) => set((state) => ({
+        clients: state.clients.map(c => c.id === id ? { ...c, ...updates } : c)
+      })),
       addPlatform: (platform) => set((state) => ({ platforms: [...state.platforms, platform] })),
       updatePlatform: (id, updates) => set((state) => ({
         platforms: state.platforms.map(p => p.id === id ? { ...p, ...updates } : p)
@@ -194,6 +209,7 @@ export const useAppStore = create<AppState>()(
           { symbol: 'USDC', type: 'Crypto' },
         ],
         accounts: [],
+        clients: [],
         platforms: [],
         operations: [],
         movements: [],

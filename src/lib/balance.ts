@@ -20,8 +20,20 @@ export const getAccountBalance = (accountId: string, state: {
 
   // Apply operations
   state.operations.forEach(op => {
+     // Check My Account Source
+     if (op.sourceMyAccountId === accountId) balance -= op.amountSent;
+     // Check Client Account Source
+     if (op.sourceClientAccountId === accountId) balance -= op.amountSent;
+     // Check My Account Destination
+     if (op.destMyAccountId === accountId) balance += op.amountReceived;
+     // Check Client Account Destination
+     if (op.destClientAccountId === accountId) balance += op.amountReceived;
+     
+     // Legacy support
      if (op.sourceAccountId === accountId) balance -= op.amountSent;
      if (op.destAccountId === accountId) balance += op.amountReceived;
+     if (op.clientSourceAccountId === accountId) balance -= op.amountSent;
+     if (op.clientDestAccountId === accountId) balance += op.amountReceived;
   });
 
   // Apply transfers

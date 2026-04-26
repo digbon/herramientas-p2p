@@ -21,6 +21,7 @@ interface PlatformPickerProps {
     platformName: string,
   ) => void;
   ownerFilter?: "Mias" | "Cliente";
+  onlyOwnerName?: string; // Filter platforms used by a specific owner
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -44,6 +45,7 @@ export function PlatformPicker({
   value,
   onSelect,
   ownerFilter,
+  onlyOwnerName,
   placeholder = "Buscar plataforma o cuenta...",
   className,
   disabled,
@@ -88,6 +90,11 @@ export function PlatformPicker({
   // Group platforms and their accounts
   const groupedPlatforms = store.platforms
     .filter((p) => !ownerFilter || p.owner === ownerFilter)
+    .filter((p) => {
+      if (!onlyOwnerName) return true;
+      // If we want only platforms of a specific owner name, we check if there are accounts of that owner for this platform
+      return store.accounts.some(a => a.platformId === p.id && a.ownerName === onlyOwnerName && a.ownerType === ownerFilter);
+    })
     .map((p) => {
       const platformAccounts: any[] = [];
 

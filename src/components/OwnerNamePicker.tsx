@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Search, ChevronDown, Check, User } from 'lucide-react';
+import { Search, ChevronDown, Check, User, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface OwnerNamePickerProps {
   value: string;
   ownerType: 'Mias' | 'Cliente';
-  onSelect: (name: string) => void;
+  onSelect: (name: string, isNew?: boolean) => void;
   disabled?: boolean;
 }
 
@@ -16,13 +16,15 @@ export function OwnerNamePicker({ value, ownerType, onSelect, disabled }: OwnerN
   const [search, setSearch] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Get unique owner names from existing accounts based on ownerType
-  const existingNames = Array.from(new Set(
-    store.accounts
-      .filter(a => a.ownerType === ownerType)
-      .map(a => a.ownerName)
-      .filter(Boolean)
-  ));
+  // Get unique owner names
+  const existingNames = ownerType === 'Cliente' 
+    ? store.clients.map(c => c.name)
+    : Array.from(new Set(
+        store.accounts
+          .filter(a => a.ownerType === ownerType)
+          .map(a => a.ownerName)
+          .filter(Boolean)
+      ));
 
   const filteredNames = existingNames.filter(name => 
     name.toLowerCase().includes(search.toLowerCase())
@@ -70,30 +72,56 @@ export function OwnerNamePicker({ value, ownerType, onSelect, disabled }: OwnerN
         </div>
       </div>
 
-      {isOpen && !disabled && (filteredNames.length > 0 || search) && (
+      {isOpen && !disabled && (
         <div className="absolute z-[100] w-full mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-48">
           <div className="flex-1 overflow-y-auto">
-            {filteredNames.length > 0 ? (
-              filteredNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => {
-                    onSelect(name);
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between p-3 hover:bg-slate-800 rounded-xl transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <User className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm font-bold text-slate-200">{name}</span>
-                  </div>
-                  {value === name && <Check className="w-4 h-4 text-blue-500" />}
-                </button>
-              ))
-            ) : (
+            {filteredNames.length > 0 && (
+              <div className="p-2 border-b border-slate-800/50">
+                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Sugerencias</span>
+              </div>
+            )}
+            {filteredNames.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  onSelect(name);
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-800 rounded-xl transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <User className="w-4 h-4 text-slate-500" />
+                  <span className="text-sm font-bold text-slate-200">{name}</span>
+                </div>
+                {value === name && <Check className="w-4 h-4 text-blue-500" />}
+              </button>
+            ))}
+            
+            {(search && (ownerType === 'Cliente' || !existingNames.includes(search))) && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(search, true);
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 hover:bg-blue-600/10 border-t border-slate-800 transition-colors text-left group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-500">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                   <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                     {existingNames.includes(search) ? 'Crear nuevo perfil' : 'Registrar como nuevo'}
+                   </div>
+                   <div className="text-xs font-bold text-slate-300">{search}</div>
+                </div>
+              </button>
+            )}
+
+            {!search && filteredNames.length === 0 && (
               <div className="p-4 text-center">
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Nombre nuevo</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Escribe para buscar o crear</p>
               </div>
             )}
           </div>

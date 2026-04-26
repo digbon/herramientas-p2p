@@ -4,6 +4,7 @@ import { PlusCircle, MinusCircle, X, Pencil, Plus, ChevronDown, Wallet, Link2, S
 import { PlatformPicker } from '../components/PlatformPicker';
 import { OwnerNamePicker } from '../components/OwnerNamePicker';
 import { AccountPicker } from '../components/AccountPicker';
+import { PlatformAccordion } from '../components/PlatformAccordion';
 import { cn } from '../lib/utils';
 import { getAccountBalance } from '../lib/balance';
 
@@ -242,6 +243,22 @@ export function Balance() {
         </div>
 
         <div className="mt-8 pt-8 border-t border-slate-800 space-y-6">
+          <SectionCard title="Mis Plataformas y Métodos de Pago" icon={<Wallet className="w-4 h-4 text-emerald-400" />}>
+            <p className="text-xs text-slate-400 mb-4 px-1 leading-relaxed">
+              Consulta tus plataformas y métodos de pago configurados. Esta vista es de solo lectura.
+            </p>
+            <div className="space-y-3">
+              {store.platforms.filter(p => p.owner === 'Mias').map(platform => (
+                <PlatformAccordion key={platform.id} platform={platform} />
+              ))}
+              {store.platforms.filter(p => p.owner === 'Mias').length === 0 && (
+                <div className="text-center py-8 bg-slate-950/30 border border-dashed border-slate-800 rounded-xl">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">No hay plataformas registradas</span>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
           <h2 className="text-xl font-bold text-white tracking-tight">Configuración del Entorno</h2>
 
           <SectionCard title="Saldos Globales (Preferencia)">

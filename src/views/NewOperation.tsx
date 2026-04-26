@@ -26,6 +26,8 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
 
   const [type, setType] = useState<"Compra" | "Venta">("Compra");
   const [order, setOrder] = useState<"Maker" | "Taker">("Maker");
+  const [clientName, setClientName] = useState("");
+  const [isNewClientSelected, setIsNewClientSelected] = useState(false);
 
   const [sourceCurrency, setSourceCurrency] = useState(store.baseFiat);
   const [sourceMyPlatformId, setSourceMyPlatformId] = useState("");
@@ -38,6 +40,14 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
   const [destMyAccountId, setDestMyAccountId] = useState("");
   const [destClientPlatformId, setDestClientPlatformId] = useState("");
   const [destClientAccountId, setDestClientAccountId] = useState("");
+
+  // Reset client selections when client changes
+  React.useEffect(() => {
+    setSourceClientPlatformId("");
+    setSourceClientAccountId("");
+    setDestClientPlatformId("");
+    setDestClientAccountId("");
+  }, [clientName]);
 
   const [counterpartName, setCounterpartName] = useState("");
   const [counterpartContact, setCounterpartContact] = useState("");
@@ -175,16 +185,39 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
   const destCurrencies = store.currencies;
 
   const handleSave = () => {
-    let finalName = counterpartName;
-    let finalContact = counterpartContact;
+    let finalClientName = clientName.trim();
+    
+    if (!finalClientName) {
+      alert("Debes ingresar un nombre de cliente");
+      return;
+    }
 
-    if (sourceClientAccountId || destClientAccountId) {
-      const clientAcc = store.accounts.find(
-        (a) => a.id === sourceClientAccountId || a.id === destClientAccountId,
+    // Identify if it's a new or existing client
+    let existingClient = !isNewClientSelected ? store.clients.find(c => c.name === finalClientName) : null;
+    
+    if (!existingClient) {
+      // Find how many clients have a similar base name to enumerate
+      const baseName = finalClientName.replace(/\s\d+$/, '');
+      const similarClients = store.clients.filter(c => 
+        c.name === baseName || c.name.startsWith(baseName + ' ')
       );
-      if (clientAcc && clientAcc.ownerName) {
-        finalName = clientAcc.ownerName;
+      
+      const newClientId = Date.now().toString();
+      
+      // If we are creating a new profile but there's already one with that exact name, 
+      // or there are already numbered ones, we add the next number.
+      if (store.clients.some(c => c.name === finalClientName) || (isNewClientSelected && similarClients.length > 0)) {
+        finalClientName = `${baseName} ${similarClients.length + 1}`;
       }
+
+      const newClient = {
+        id: newClientId,
+        name: finalClientName,
+        contact: counterpartContact,
+        createdAt: new Date().toISOString()
+      };
+      store.addClient(newClient);
+      existingClient = newClient;
     }
 
     store.addOperation({
@@ -201,8 +234,8 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
       destMyAccountId,
       destClientPlatformId,
       destClientAccountId,
-      counterpartName: finalName,
-      counterpartContact: finalContact,
+      counterpartName: finalClientName,
+      counterpartContact: counterpartContact,
       amountSent: parseFloat(amountSent) || 0,
       price: parseFloat(price) || 0,
       amountReceived: parseFloat(amountReceived) || 0,
@@ -246,9 +279,25 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-
           <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y">
             <div className="space-y-4">
+              <div className="space-y-1 relative">
+                <label className="text-xs text-slate-400">
+                  Cliente <span className="text-red-500">*</span>
+                </label>
+                <OwnerNamePicker 
+                  value={clientName} 
+                  ownerType="Cliente" 
+                  onSelect={(name, isNew) => {
+                    setClientName(name);
+                    setIsNewClientSelected(!!isNew);
+                  }} 
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Selecciona un cliente existente o escribe uno nuevo para registrarlo.
+                </p>
+              </div>
+
               <div className="space-y-1 relative">
                 <label className="text-xs text-slate-400">
                   Tipo de Operación
@@ -306,7 +355,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                     {sourceCurrencies.map((c) => (
                       <option key={c.symbol} value={c.symbol}>
                         {c.symbol}
-                      </option>
+                       </option>
                     ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
@@ -385,7 +434,9 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                 </div>
 
                 <div className="space-y-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800/50 pb-1">Del cliente</div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800/50 pb-1">
+                    Del cliente {clientName ? `(${clientName})` : ''}
+                  </div>
                   <div className="space-y-3">
                     <div className="space-y-1 relative">
                       <label className="text-[10px] text-slate-400">
@@ -395,6 +446,9 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         value={sourceClientPlatformId}
                         onlyPlatforms={true}
                         ownerFilter="Cliente"
+                        onlyOwnerName={clientName}
+                        disabled={!clientName}
+                        placeholder={clientName ? "Buscar plataforma..." : "Selecciona primero un cliente"}
                         onSelect={(pId) => {
                           setSourceClientPlatformId(pId);
                           setSourceClientAccountId("");
@@ -441,6 +495,8 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         currency={sourceCurrency}
                         platformId={sourceClientPlatformId}
                         onlyOwner="Cliente"
+                        onlyOwnerName={clientName}
+                        disabled={!clientName || !sourceClientPlatformId}
                         value={sourceClientAccountId}
                         onSelect={(val) => setSourceClientAccountId(val)}
                         onAddNew={() => {
@@ -555,7 +611,9 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                 </div>
 
                 <div className="space-y-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800/50 pb-1">Del cliente</div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800/50 pb-1">
+                    Del cliente {clientName ? `(${clientName})` : ''}
+                  </div>
                   <div className="space-y-3">
                     <div className="space-y-1 relative">
                       <label className="text-[10px] text-slate-400">
@@ -565,6 +623,9 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         value={destClientPlatformId}
                         onlyPlatforms={true}
                         ownerFilter="Cliente"
+                        onlyOwnerName={clientName}
+                        disabled={!clientName}
+                        placeholder={clientName ? "Buscar plataforma..." : "Selecciona primero un cliente"}
                         onSelect={(pId) => {
                           setDestClientPlatformId(pId);
                           setDestClientAccountId("");
@@ -611,6 +672,8 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         currency={destCurrency}
                         platformId={destClientPlatformId}
                         onlyOwner="Cliente"
+                        onlyOwnerName={clientName}
+                        disabled={!clientName || !destClientPlatformId}
                         value={destClientAccountId}
                         onSelect={(val) => setDestClientAccountId(val)}
                         onAddNew={() => {
@@ -628,7 +691,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            <div className="space-y-4">
+          <div className="space-y-4">
               <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-400">
                 <FileText className="w-4 h-4" /> Detalles Financieros
               </h3>
@@ -906,7 +969,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
           <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-800 bg-slate-950 flex gap-3 shrink-0">
             <button
               onClick={handleSave}
-              disabled={!amountSent || !amountReceived}
+              disabled={!amountSent || !amountReceived || !clientName.trim()}
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:hover:bg-emerald-600 text-white py-3 rounded-xl font-bold transition-colors"
             >
               Guardar
@@ -927,6 +990,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
           platformId={showAddAccountModal.platformId}
           owner={showAddAccountModal.owner}
           accountIdToEdit={showAddAccountModal.editAccountId}
+          defaultOwnerName={showAddAccountModal.owner === "Cliente" ? clientName : "Yo"}
           store={store}
           onAdd={(id) => {
             if (showAddAccountModal.target === "sourceMy") setSourceMyAccountId(id);
@@ -976,6 +1040,7 @@ function MiniAddAccountModal({
   platformId,
   owner,
   accountIdToEdit,
+  defaultOwnerName,
   onAdd,
   onClose,
   store,
@@ -984,6 +1049,7 @@ function MiniAddAccountModal({
   platformId: string;
   owner: "Mias" | "Cliente";
   accountIdToEdit?: string;
+  defaultOwnerName?: string;
   onAdd: (id: string) => void;
   onClose: () => void;
   store: any;
@@ -994,7 +1060,7 @@ function MiniAddAccountModal({
   const [name, setName] = useState(accountToEdit?.name || "");
   const [tag, setTag] = useState(accountToEdit?.tag || "");
   const [ownerName, setOwnerName] = useState(
-    accountToEdit?.ownerName || (owner === "Mias" ? "Yo" : ""),
+    accountToEdit?.ownerName || defaultOwnerName || (owner === "Mias" ? "Yo" : ""),
   );
   const [initialBalance, setInitialBalance] = useState(
     accountToEdit?.initialBalance?.toString() || "",

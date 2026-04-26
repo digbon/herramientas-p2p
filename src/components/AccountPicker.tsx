@@ -11,9 +11,11 @@ interface AccountPickerProps {
   platformId?: string; // Filter by platform if provided
   excludeOwner?: string; // e.g., 'Cliente'
   onlyOwner?: string; // e.g., 'Cliente'
+  onlyOwnerName?: string; // Filter by specific owner name
   excludeId?: string; // Account to exclude from the list
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
   onAddNew?: () => void;
   onEdit?: (id: string) => void;
 }
@@ -25,9 +27,11 @@ export function AccountPicker({
   platformId,
   excludeOwner,
   onlyOwner,
+  onlyOwnerName,
   excludeId,
   placeholder = "Buscar cuenta...",
   className,
+  disabled,
   onAddNew,
   onEdit,
 }: AccountPickerProps) {
@@ -47,6 +51,7 @@ export function AccountPicker({
     })
     .filter((a) => !excludeOwner || a.ownerType !== excludeOwner)
     .filter((a) => !onlyOwner || a.ownerType === onlyOwner)
+    .filter((a) => !onlyOwnerName || a.ownerName === onlyOwnerName)
     .filter((a) => !excludeId || a.id !== excludeId)
     .filter((a) => {
       const platformNames =
@@ -80,11 +85,17 @@ export function AccountPicker({
   return (
     <div className={cn("relative", className)} ref={containerRef}>
       <div
-        className="relative cursor-pointer group"
-        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "relative group",
+          disabled ? "cursor-not-allowed" : "cursor-pointer"
+        )}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         {!isOpen && selectedAccount ? (
-          <div className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between group-hover:border-blue-500/50 transition-all shadow-lg shadow-black/20">
+          <div className={cn(
+            "w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 flex items-center justify-between group-hover:border-blue-500/50 transition-all shadow-lg shadow-black/20",
+            disabled && "opacity-50 grayscale cursor-not-allowed"
+          )}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-blue-600/10 border border-blue-500/20 flex items-center justify-center font-black text-blue-500 text-[10px]">
                 {selectedAccount.name.slice(0, 2).toUpperCase()}
@@ -114,13 +125,14 @@ export function AccountPicker({
                 )}
               </div>
             </div>
-            <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition-colors" />
+            {!disabled && <ChevronDown className="w-4 h-4 text-slate-500 group-hover:text-blue-500 transition-colors" />}
           </div>
         ) : (
           <>
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 group-hover:text-blue-500 transition-colors" />
             <input
               type="text"
+              disabled={disabled}
               placeholder={placeholder}
               value={isOpen ? search : ""}
               onChange={(e) => {
@@ -128,11 +140,16 @@ export function AccountPicker({
                 setIsOpen(true);
               }}
               onFocus={() => {
-                setIsOpen(true);
-                setSearch("");
+                if (!disabled) {
+                  setIsOpen(true);
+                  setSearch("");
+                }
               }}
               readOnly={!isOpen}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600 cursor-pointer"
+              className={cn(
+                "w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600",
+                disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+              )}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
               <ChevronDown
