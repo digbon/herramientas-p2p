@@ -7,19 +7,41 @@ export type Currency = {
   isPrincipal?: boolean;
 };
 
+export type PaymentMethod = {
+  id: string;
+  type: string;
+  value: string;
+  label: string;
+};
+
 export type Account = {
   id: string;
   currency: string;
+  tag: string; // e.g. #1, #2, #3
   name: string;
+  ownerType: 'Mias' | 'Cliente';
+  ownerName: string; // Full name of the owner
   initialBalance: number;
+  platformId?: string;
+  platformValue?: string; // The ID/Alias/Number in that platform
+  details?: string;
+  clientContact?: string;
+  paymentMethods?: PaymentMethod[];
+};
+
+export type PlatformAccount = {
+  id: string;
+  value: string;
+  label?: string;
 };
 
 export type Platform = {
   id: string;
-  owner: 'Mias' | 'Cliente';
+  owner?: 'Mias' | 'Cliente';
   type: 'Fiat' | 'Crypto';
   name: string;
-  details?: string;
+  details?: string; // keeping for backward compatibility
+  accounts?: PlatformAccount[];
 };
 
 export type Movement = {
@@ -38,14 +60,24 @@ export type Attachment = {
   type: string;
 };
 
+export type Commission = {
+  name?: string;
+  value: number;
+  type: 'fixed' | 'percentage';
+};
+
 export type Operation = {
   id: string;
   type: 'Compra' | 'Venta';
   order: 'Maker' | 'Taker';
   sourceCurrency: string;
   sourceAccountId: string;
+  sourcePlatformId?: string;
+  clientDestAccountId?: string;
   destCurrency: string;
   destAccountId: string;
+  destPlatformId?: string;
+  clientSourceAccountId?: string;
   counterpartName: string;
   counterpartContact?: string;
   myPlatformId?: string;
@@ -53,13 +85,24 @@ export type Operation = {
   amountSent: number;
   price: number;
   amountReceived: number;
-  commission: number;
+  commissionsSent: Commission[];
+  commissionsReceived: Commission[];
   notes?: string;
   date: string;
   attachments?: Attachment[];
 };
 
-type AppState = {
+export type Transfer = {
+  id: string;
+  sourceAccountId: string;
+  destAccountId: string;
+  amount: number;
+  commissions: Commission[];
+  date: string;
+  notes?: string;
+};
+
+export type AppState = {
   baseFiat: string;
   baseCrypto: string;
   currencies: Currency[];
@@ -67,6 +110,7 @@ type AppState = {
   platforms: Platform[];
   operations: Operation[];
   movements: Movement[];
+  transfers: Transfer[];
   setBaseFiat: (fiat: string) => void;
   setBaseCrypto: (crypto: string) => void;
   addCurrency: (currency: Currency) => void;
@@ -76,9 +120,11 @@ type AppState = {
   updateAccount: (id: string, updates: Partial<Account>) => void;
   removeAccount: (id: string) => void;
   addPlatform: (platform: Platform) => void;
+  updatePlatform: (id: string, updates: Partial<Platform>) => void;
   removePlatform: (id: string) => void;
   addOperation: (operation: Operation) => void;
   addMovement: (movement: Movement) => void;
+  addTransfer: (transfer: Transfer) => void;
   resetAll: () => void;
   importData: (data: Partial<AppState>) => void;
 };
@@ -96,10 +142,10 @@ export const useAppStore = create<AppState>()(
         { symbol: 'USDC', type: 'Crypto' },
       ],
       accounts: [
-        { id: '1', currency: 'USDT', name: 'Cuenta 1', initialBalance: 180 },
-        { id: '2', currency: 'USDT', name: 'Cuenta 2', initialBalance: 20 },
-        { id: '3', currency: 'BOB', name: 'Cuenta 1', initialBalance: 950 },
-        { id: '4', currency: 'BTC', name: 'Cuenta 1', initialBalance: 0.00123 },
+        { id: '1', currency: 'USDT', tag: '#1', name: 'Cuenta Principal', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 180, platformId: '3' },
+        { id: '2', currency: 'USDT', tag: '#2', name: 'Cuenta Secundaria', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 20, platformId: '3' },
+        { id: '3', currency: 'BOB', tag: '#1', name: 'Ahorros BCP', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 950, platformId: '2' },
+        { id: '4', currency: 'BTC', tag: '#1', name: 'Binance BTC', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 0.00123, platformId: '3' },
       ],
       platforms: [
         { id: '1', owner: 'Mias', type: 'Fiat', name: 'YapeBolivia', details: '78979555' },
@@ -109,6 +155,7 @@ export const useAppStore = create<AppState>()(
       ],
       operations: [],
       movements: [],
+      transfers: [],
       setBaseFiat: (fiat) => set({ baseFiat: fiat }),
       setBaseCrypto: (crypto) => set({ baseCrypto: crypto }),
       addCurrency: (currency) => set((state) => ({ currencies: [...state.currencies, currency] })),
@@ -122,9 +169,13 @@ export const useAppStore = create<AppState>()(
       })),
       removeAccount: (id) => set((state) => ({ accounts: state.accounts.filter(a => a.id !== id) })),
       addPlatform: (platform) => set((state) => ({ platforms: [...state.platforms, platform] })),
+      updatePlatform: (id, updates) => set((state) => ({
+        platforms: state.platforms.map(p => p.id === id ? { ...p, ...updates } : p)
+      })),
       removePlatform: (id) => set((state) => ({ platforms: state.platforms.filter(p => p.id !== id) })),
       addOperation: (operation) => set((state) => ({ operations: [...state.operations, operation] })),
       addMovement: (movement) => set((state) => ({ movements: [...state.movements, movement] })),
+      addTransfer: (transfer) => set((state) => ({ transfers: [...state.transfers, transfer] })),
       resetAll: () => set({
         baseFiat: 'BOB',
         baseCrypto: 'USDT',
@@ -139,6 +190,7 @@ export const useAppStore = create<AppState>()(
         platforms: [],
         operations: [],
         movements: [],
+        transfers: [],
       }),
       importData: (data) => set((state) => ({ ...state, ...data })),
     }),

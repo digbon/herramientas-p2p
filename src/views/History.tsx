@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { NewOperation } from './NewOperation';
@@ -47,11 +47,12 @@ export function History() {
       </div>
 
       <div>
-        <div className="flex border-b border-slate-800">
-           {['Operaciones', 'Depósitos', 'Retiros'].map((tab) => {
+        <div className="flex border-b border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-hide">
+           {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias'].map((tab) => {
             const count = tab === 'Operaciones' ? store.operations.length 
               : tab === 'Depósitos' ? store.movements.filter(m => m.type === 'Deposit').length
-              : store.movements.filter(m => m.type === 'Withdrawal').length;
+              : tab === 'Retiros' ? store.movements.filter(m => m.type === 'Withdrawal').length
+              : store.transfers.length;
              
             return (
               <button
@@ -71,8 +72,57 @@ export function History() {
           {listTab === 'Operaciones' && store.operations.length === 0 && "No hay operaciones en el período seleccionado."}
           {listTab === 'Depósitos' && store.movements.filter(m => m.type === 'Deposit').length === 0 && "No hay depósitos en el período seleccionado."}
           {listTab === 'Retiros' && store.movements.filter(m => m.type === 'Withdrawal').length === 0 && "No hay retiros en el período seleccionado."}
+          {listTab === 'Transferencias' && store.transfers.length === 0 && "No hay transferencias en el período seleccionado."}
           
           <div className="space-y-3">
+             {listTab === 'Transferencias' && store.transfers.map(t => {
+                const sourceAcc = store.accounts.find(a => a.id === t.sourceAccountId);
+                const destAcc = store.accounts.find(a => a.id === t.destAccountId);
+                const currency = sourceAcc?.currency || '';
+                
+                const totalComs = t.commissions.reduce((acc, c) => {
+                  if (c.type === 'percentage') return acc + (t.amount * c.value) / 100;
+                  return acc + c.value;
+                }, 0);
+
+                return (
+                  <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
+                    <div className="mt-1 p-2 rounded-full shrink-0 bg-blue-500/20 text-blue-500">
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="font-semibold text-white truncate">Transferencia</div>
+                        <div className="text-xs text-slate-500 whitespace-nowrap ml-2">
+                          {format(new Date(t.date), 'dd/MM/yyyy HH:mm')}
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mb-3">
+                         <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <span className="truncate max-w-[80px] font-bold text-slate-300">{sourceAcc?.name}</span>
+                            <ArrowRightLeft className="w-3 h-3 text-slate-600" />
+                            <span className="truncate max-w-[80px] font-bold text-slate-300">{destAcc?.name}</span>
+                         </div>
+                         <span className="font-black text-white">{t.amount} <span className="text-slate-500 font-normal text-[10px]">{currency}</span></span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-950 p-2 rounded-lg">
+                        <div>
+                          <div className="text-slate-500 uppercase font-black tracking-widest mb-0.5">Comisiones</div>
+                          <div className="text-amber-500 font-bold">{totalComs > 0 ? `-${totalComs.toFixed(2)}` : '0.00'} {currency}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-slate-500 uppercase font-black tracking-widest mb-0.5">Costo Total</div>
+                          <div className="text-white font-bold">{(t.amount + totalComs).toFixed(2)} {currency}</div>
+                        </div>
+                      </div>
+
+                      {t.notes && <div className="mt-2 text-xs text-slate-500 italic">"{t.notes}"</div>}
+                    </div>
+                  </div>
+                );
+             })}
+
              {listTab === 'Operaciones' && store.operations.map(op => (
                 <div key={op.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
                   <div className={cn("mt-1 p-2 rounded-full shrink-0", op.type === 'Compra' ? "bg-emerald-500/20 text-emerald-500" : "bg-red-500/20 text-red-500")}>

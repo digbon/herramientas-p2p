@@ -1,39 +1,29 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../store';
-import { PlusCircle, MinusCircle, X, Pencil, Plus, ChevronDown } from 'lucide-react';
+import { useAppStore, Account, PaymentMethod } from '../store';
+import { PlusCircle, MinusCircle, X, Pencil, Plus, ChevronDown, Wallet, Link2, Search, Trash2, ArrowRightLeft } from 'lucide-react';
+import { PlatformPicker } from '../components/PlatformPicker';
+import { OwnerNamePicker } from '../components/OwnerNamePicker';
+import { AccountPicker } from '../components/AccountPicker';
 import { cn } from '../lib/utils';
+import { getAccountBalance } from '../lib/balance';
 
 export function Balance() {
   const store = useAppStore();
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [isInitialBalanceModalOpen, setIsInitialBalanceModalOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [transferCurrency, setTransferCurrency] = useState('');
   
   const [newCurrency, setNewCurrency] = useState('');
-  const [newCurrencyType, setNewCurrencyType] = useState<'Fiat' | 'Crypto'>('Fiat');
+  const [newCurrencyType, setNewCurrencyType] = useState<'Fiat'|'Crypto'>('Fiat');
 
-  const getSaldoActual = (accountId: string) => {
-    const account = store.accounts.find(a => a.id === accountId);
-    if (!account) return 0;
-    
-    let balance = account.initialBalance;
-    store.movements.forEach(m => {
-      if (m.accountId === accountId) {
-         if (m.type === 'Deposit') balance += m.amount;
-         if (m.type === 'Withdrawal') balance -= m.amount;
-      }
-    });
+  const [accountToEdit, setAccountToEdit] = useState<Account | null>(null);
+  const [isNewAccount, setIsNewAccount] = useState(false);
 
-    store.operations.forEach(op => {
-       if (op.sourceAccountId === accountId) balance -= op.amountSent;
-       if (op.destAccountId === accountId) balance += op.amountReceived;
-    });
+  const getSaldoActual = (accountId: string) => getAccountBalance(accountId, store);
 
-    return balance;
-  };
-
-  const getCryptoBalance = (symbol: string) => store.accounts.filter(a => a.currency === symbol).reduce((acc, a) => acc + getSaldoActual(a.id), 0);
-  const getFiatBalance = (symbol: string) => store.accounts.filter(a => a.currency === symbol).reduce((acc, a) => acc + getSaldoActual(a.id), 0);
+  const getCryptoBalance = (symbol: string) => store.accounts.filter(a => a.currency === symbol && a.ownerType !== 'Cliente').reduce((acc, a) => acc + getSaldoActual(a.id), 0);
+  const getFiatBalance = (symbol: string) => store.accounts.filter(a => a.currency === symbol && a.ownerType !== 'Cliente').reduce((acc, a) => acc + getSaldoActual(a.id), 0);
 
   const cryptoCurrencies = store.currencies.filter(c => c.type === 'Crypto');
   const fiatCurrencies = store.currencies.filter(c => c.type === 'Fiat');
@@ -59,7 +49,7 @@ export function Balance() {
                   {getCryptoBalance(c.symbol).toFixed(5).replace(/\.?0+$/, '') || '0.00'}
                 </div>
                 <div className="text-xs text-teal-300/70 mt-1">
-                  en {store.accounts.filter(a => a.currency === c.symbol).length} cuenta(s)
+                  en {store.accounts.filter(a => a.currency === c.symbol && a.ownerType !== 'Cliente').length} cuenta(s)
                 </div>
               </div>
             ))}
@@ -82,7 +72,7 @@ export function Balance() {
                   {getFiatBalance(c.symbol).toFixed(2)}
                 </div>
                 <div className="text-xs text-purple-200/70 mt-1">
-                  en {store.accounts.filter(a => a.currency === c.symbol).length} cuenta(s)
+                  en {store.accounts.filter(a => a.currency === c.symbol && a.ownerType !== 'Cliente').length} cuenta(s)
                 </div>
               </div>
             ))}
@@ -94,12 +84,24 @@ export function Balance() {
         <h1 className="text-2xl font-bold text-white mb-1">Balance</h1>
         <p className="text-sm text-slate-400 mb-4">Gestiona tus cuentas y saldos por moneda.</p>
         
-        <div className="flex gap-3 mb-6">
-           <button onClick={() => setIsDepositOpen(true)} className="flex-1 bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-             <PlusCircle className="w-5 h-5" /> Agregar Capital
+        <div className="grid grid-cols-3 gap-3 mb-6">
+           <button onClick={() => setIsDepositOpen(true)} className="bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/5">
+             <PlusCircle className="w-5 h-5" />
+             <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">Capital</span>
            </button>
-           <button onClick={() => setIsWithdrawOpen(true)} className="flex-1 bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-colors py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
-             <MinusCircle className="w-5 h-5" /> Retirar Capital
+           <button onClick={() => setIsWithdrawOpen(true)} className="bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-amber-500/5">
+             <MinusCircle className="w-5 h-5" />
+             <span className="text-[10px] uppercase font-black tracking-widest text-amber-400/80">Retiro</span>
+           </button>
+           <button 
+             onClick={() => {
+               setTransferCurrency(store.baseCrypto);
+               setIsTransferOpen(true);
+             }} 
+             className="bg-blue-600/20 text-blue-500 border border-blue-500/30 hover:bg-blue-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-500/5"
+           >
+             <ArrowRightLeft className="w-5 h-5" />
+             <span className="text-[10px] uppercase font-black tracking-widest text-blue-400/80">Transferir</span>
            </button>
         </div>
 
@@ -108,63 +110,120 @@ export function Balance() {
              const accounts = store.accounts.filter(a => a.currency === currency.symbol);
              
              return (
-               <div key={currency.symbol} className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-                 <div className="flex items-center justify-between mb-4">
-                   <div className="flex items-center gap-2">
-                     <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-white text-xs">
+               <div key={currency.symbol} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6">
+                 <div className="flex items-center justify-between mb-6">
+                   <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-white text-sm shadow-inner group">
                         {currency.symbol.slice(0, 3)}
                      </div>
                      <div>
                        <div className="flex items-center gap-2">
-                         <span className="font-bold text-lg text-white">{currency.symbol}</span>
-                         <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded uppercase">{currency.type}</span>
+                         <span className="font-black text-xl text-white tracking-tighter">{currency.symbol}</span>
+                         <span className="text-[10px] font-black bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-widest">{currency.type}</span>
                        </div>
-                       <div className="text-xs text-slate-500">{accounts.length} cuentas</div>
+                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{accounts.length} cuentas registradas</div>
                      </div>
                    </div>
                    
                    <button 
-                     onClick={() => store.addAccount({ id: Date.now().toString(), currency: currency.symbol, name: `Cuenta ${accounts.length + 1}`, initialBalance: 0 })}
-                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                     onClick={() => {
+                        const tempId = Date.now().toString();
+                        setAccountToEdit({ 
+                          id: tempId, 
+                          currency: currency.symbol, 
+                          tag: `#${accounts.length + 1}`,
+                          name: '', 
+                          ownerName: '',
+                          ownerType: 'Mias',
+                          initialBalance: 0 
+                        } as Account);
+                        setIsNewAccount(true);
+                      }}
+                     className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95"
                    >
-                     <Plus className="w-4 h-4" /> Cuenta
+                     <Plus className="w-4 h-4" /> Nueva Cuenta
                    </button>
                  </div>
 
-                 <div className="space-y-3">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    {accounts.map((acc, i) => {
                      const isLast = accounts.length === 1;
+                     const platform = acc.platformId ? store.platforms.find(p => p.id === acc.platformId) : null;
+                     
                      return (
-                       <div key={acc.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 relative">
-                         <div className="flex items-center justify-between mb-3">
-                           <div className="flex items-center gap-2">
-                             <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded">#{i + 1}</span>
-                             <span className="font-bold text-sm text-white">{acc.name}</span>
-                             <button className="text-slate-500 hover:text-white"><Pencil className="w-3 h-3" /></button>
+                       <div key={acc.id} className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden relative group">
+                         {/* Header: Owner & Tag */}
+                         <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex justify-between items-start">
+                           <div className="space-y-1">
+                             <div className="flex items-center gap-2">
+                               <span className={cn(
+                                 "text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                                 acc.ownerType === 'Mias' ? "bg-purple-500/10 text-purple-400" : "bg-teal-500/10 text-teal-400"
+                               )}>
+                                 {acc.ownerType === 'Mias' ? 'Mi' : 'Cliente'}
+                               </span>
+                               <span className="text-white font-bold text-sm tracking-tight">{acc.ownerName}</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <span className="text-blue-500 font-black text-lg">{acc.tag}</span>
+                               <span className="text-slate-400 font-bold text-lg">{acc.name}</span>
+                             </div>
                            </div>
-                           <button 
-                             onClick={() => {
-                               if (isLast) {
-                                 alert(`No se puede eliminar la única cuenta de ${currency.symbol}. Cada moneda activa debe tener al menos una cuenta.`);
-                               } else {
-                                 store.removeAccount(acc.id);
-                               }
-                             }}
-                             className="text-slate-500 hover:text-red-500"
-                           >
-                             <X className="w-4 h-4" />
-                           </button>
+                            <div className="flex gap-1">
+                             <button 
+                                onClick={() => {
+                                  setAccountToEdit(acc);
+                                  setIsNewAccount(false);
+                                }}
+                                className="p-2 text-slate-500 hover:text-white transition-colors"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button 
+                               onClick={() => {
+                                 if (!isLast) store.removeAccount(acc.id);
+                               }}
+                               disabled={isLast}
+                               className="p-2 text-slate-800 hover:text-red-500 transition-colors disabled:opacity-0"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           </div>
                          </div>
-                         
-                         <div className="flex gap-2">
-                           <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2.5">
-                             <div className="text-[10px] text-slate-500 font-bold mb-1">SALDO ACTUAL</div>
-                             <div className="font-bold text-base text-white">{getSaldoActual(acc.id).toFixed(2)}</div>
-                           </div>
-                           <div className="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2.5">
-                             <div className="text-[10px] text-slate-500 font-bold mb-1">SALDO INICIAL</div>
-                             <EditInitialBalance account={acc} />
-                           </div>
+
+                         {/* Platform Info */}
+                         <div className="p-4 bg-slate-900/10">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center">
+                                <Link2 className="w-5 h-5 text-blue-500 -rotate-45" />
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Plataforma / Canal</div>
+                                <div className="text-white font-bold text-sm">
+                                  {platform ? platform.name : <span className="text-slate-600 italic">No vinculada</span>}
+                                  {acc.platformValue && (
+                                    <span className="ml-2 text-slate-400 font-mono text-xs">: {acc.platformValue}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                         </div>
+
+                         {/* Balances Section */}
+                         <div className="grid grid-cols-2 border-t border-slate-800 divide-x divide-slate-800">
+                            <div className="p-4 bg-slate-900/5 transition-colors group-hover:bg-slate-900/20">
+                              <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-70">Saldo Inicial</div>
+                              <div className="text-slate-400 font-bold text-base tracking-tighter">
+                                {acc.initialBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: acc.currency === 'BTC' ? 5 : 2 })}
+                              </div>
+                            </div>
+                            <div className="p-4 bg-blue-600/5 transition-colors group-hover:bg-blue-600/10 border-l-4 border-l-blue-500/50">
+                              <div className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1.5">Saldo Actual</div>
+                              <div className="text-white font-black text-xl tracking-tight leading-none pt-0.5">
+                                {getSaldoActual(acc.id).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: acc.currency === 'BTC' ? 5 : 2 })}
+                                <span className="text-[10px] ml-1.5 opacity-50">{acc.currency}</span>
+                              </div>
+                            </div>
                          </div>
                        </div>
                      );
@@ -178,87 +237,61 @@ export function Balance() {
         <div className="mt-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
            <h3 className="font-bold text-white">Información</h3>
            <p className="text-sm text-slate-400">
-             El saldo actual de cada cuenta = saldo inicial + depósitos - retiros + efecto de las operaciones registradas. Para añadir o retirar capital usa los botones de arriba; el historial seguirá mostrando esos movimientos.
+             El saldo actual de cada cuenta se calcula automáticamente sumando el capital inicial y el resultado neto de todas las operaciones y movimientos registrados.
            </p>
         </div>
 
         <div className="mt-8 pt-8 border-t border-slate-800 space-y-6">
-          <h2 className="text-xl font-bold text-white">Configuración de Balances</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">Configuración del Entorno</h2>
 
-          <SectionCard title="Configuración de Visualización de Divisas">
+          <SectionCard title="Saldos Globales (Preferencia)">
             <div className="space-y-4">
               <div className="space-y-1 relative">
-                <label className="text-xs text-slate-400">Etiqueta para tu Moneda Fiat (Local)</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Moneda Local Base</label>
                 <select
                   value={store.baseFiat}
                   onChange={(e) => store.setBaseFiat(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500 font-bold"
                 >
                   {store.currencies.filter(c => c.type === 'Fiat').map(c => (
                     <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                   ))}
-                  {!store.currencies.find(c => c.symbol === store.baseFiat && c.type === 'Fiat') && store.baseFiat && (
-                    <option value={store.baseFiat}>{store.baseFiat}</option>
-                  )}
                 </select>
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
               </div>
               <div className="space-y-1 relative">
-                <label className="text-xs text-slate-400">Etiqueta para tu Criptomoneda Principal</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Criptomoneda Base</label>
                 <select
                   value={store.baseCrypto}
                   onChange={(e) => store.setBaseCrypto(e.target.value)}
-                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500"
+                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white appearance-none focus:outline-none focus:border-blue-500 font-bold"
                 >
                   {store.currencies.filter(c => c.type === 'Crypto').map(c => (
                     <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                   ))}
-                  {!store.currencies.find(c => c.symbol === store.baseCrypto && c.type === 'Crypto') && store.baseCrypto && (
-                    <option value={store.baseCrypto}>{store.baseCrypto}</option>
-                  )}
                 </select>
                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed text-center !mt-4">
-                Estas etiquetas se usarán para mostrar tus saldos y operaciones.
-              </p>
             </div>
-          </SectionCard>
-          
-          <SectionCard title="Saldo Inicial">
-            <div className="space-y-2 text-sm text-slate-300 mb-4">
-              {store.currencies.map(c => (
-                  <div key={c.symbol}>Balance {c.symbol} Inicial: <span className="font-semibold text-white">{c.type === 'Fiat' ? getFiatBalance(c.symbol).toFixed(2) : getCryptoBalance(c.symbol).toFixed(2)}</span></div>
-              ))}
-            </div>
-            <button onClick={() => setIsInitialBalanceModalOpen(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">
-              Modificar Saldo Inicial
-            </button>
           </SectionCard>
 
-          <SectionCard title="Mis Monedas">
-            <p className="text-xs text-slate-400 mb-4">
-              Cada moneda lleva una etiqueta (fiat o cripto) y aparece como opción al crear operaciones. Puedes combinar cualquier par: BOB - USDT, USD - ARS.
+          <SectionCard title="Mis Divisas">
+            <p className="text-xs text-slate-400 mb-4 px-1 leading-relaxed">
+              Las divisas registradas habilitan cuentas y pares de operación.
             </p>
             <div className="space-y-2 mb-4">
               {store.currencies.map(c => (
-                <div key={c.symbol} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800">
-                  <span className="font-semibold text-white min-w-[50px]">{c.symbol}</span>
-                  {(c.symbol === store.baseCrypto || c.symbol === store.baseFiat) && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">PRINCIPAL</span>}
-                  <div className="flex-1" />
-                  <div className="relative">
-                    <select 
-                        className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-sm text-slate-300 outline-none appearance-none pr-7"
-                        value={c.type}
-                        disabled
-                      >
-                      <option>Fiat</option>
-                      <option>Crypto</option>
-                    </select>
-                    <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div key={c.symbol} className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800 group">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-white text-[10px]">
+                    {c.symbol.slice(0, 3)}
                   </div>
+                  <span className="font-black text-white flex-1">{c.symbol}</span>
+                  {(c.symbol === store.baseCrypto || c.symbol === store.baseFiat) && <span className="text-[10px] font-black px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 tracking-widest uppercase">Base</span>}
+                  
+                  <span className="text-[10px] font-bold text-slate-600 uppercase pr-2">{c.type}</span>
+                  
                   {!(c.symbol === store.baseCrypto || c.symbol === store.baseFiat) && (
-                    <button onClick={() => store.removeCurrency(c.symbol)} className="p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-500 rounded"><X className="w-4 h-4" /></button>
+                    <button onClick={() => store.removeCurrency(c.symbol)} className="p-1 hover:bg-red-500/20 text-slate-700 hover:text-red-500 rounded"><X className="w-4 h-4" /></button>
                   )}
                 </div>
               ))}
@@ -266,19 +299,19 @@ export function Balance() {
             <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Ej: ARS, ETH, USDC" 
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 uppercase"
+                  placeholder="Ej: ARS" 
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 uppercase font-black"
                   value={newCurrency}
                   onChange={e => setNewCurrency(e.target.value.toUpperCase())}
                 />
                 <div className="relative">
                   <select 
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-3 pr-8 py-2 text-sm text-white outline-none focus:border-blue-500 appearance-none"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-8 py-2.5 text-sm text-white outline-none focus:border-blue-500 appearance-none font-bold"
                     value={newCurrencyType}
                     onChange={e => setNewCurrencyType(e.target.value as 'Fiat' | 'Crypto')}
                   >
                     <option value="Fiat">Fiat</option>
-                    <option value="Crypto">Crypto</option>
+                    <option value="Crypto">Cripto</option>
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
@@ -289,7 +322,7 @@ export function Balance() {
                       setNewCurrency('');
                     }
                   }}
-                  className="w-10 h-10 bg-blue-600 hover:bg-blue-700 flex items-center justify-center rounded-lg text-white"
+                  className="w-11 h-11 bg-blue-600 hover:bg-blue-700 flex items-center justify-center rounded-xl text-white shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -301,8 +334,243 @@ export function Balance() {
 
       {isDepositOpen && <CapitalModal type="Deposit" onClose={() => setIsDepositOpen(false)} />}
       {isWithdrawOpen && <CapitalModal type="Withdrawal" onClose={() => setIsWithdrawOpen(false)} />}
-      {isInitialBalanceModalOpen && <InitialBalanceModal onClose={() => setIsInitialBalanceModalOpen(false)} />}
+      {isTransferOpen && <TransferModal currency={transferCurrency} onClose={() => setIsTransferOpen(false)} />}
+      {accountToEdit && <EditAccountModal account={accountToEdit} isNew={isNewAccount} onClose={() => setAccountToEdit(null)} />}
     </div>
+  );
+}
+
+function EditAccountModal({ account, onClose, isNew = false }: { account: Account, onClose: () => void, isNew?: boolean }) {
+  const store = useAppStore();
+  const [name, setName] = useState(account.name);
+  const [tag, setTag] = useState(account.tag || '');
+  const [ownerName, setOwnerName] = useState(account.ownerName || '');
+  const [ownerType, setOwnerType] = useState<'Mias' | 'Cliente'>(account.ownerType || 'Mias');
+  const [platformId, setPlatformId] = useState(account.platformId || '');
+  const [platformValue, setPlatformValue] = useState(account.platformValue || '');
+  const [initialBalance, setInitialBalance] = useState(account.initialBalance.toString());
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(account.paymentMethods || []);
+  const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
+
+  const handleSave = () => {
+    if (isNew) {
+      store.addAccount({
+        ...account,
+        name,
+        tag,
+        ownerName,
+        ownerType,
+        platformId,
+        platformValue,
+        initialBalance: parseFloat(initialBalance) || 0,
+        paymentMethods
+      });
+    } else {
+      store.updateAccount(account.id, { 
+        name,
+        paymentMethods 
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center justify-center pointer-events-none sm:p-4">
+        <div className="bg-slate-900 pointer-events-auto sm:border border-t border-slate-800 w-full max-w-md max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0">
+            <h2 className="text-lg font-bold text-white tracking-tight">Configurar Cuenta</h2>
+            <button onClick={onClose} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y">
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Etiqueta (#1, #2...)</label>
+                <input 
+                  type="text" 
+                  value={tag} 
+                  onChange={e => setTag(e.target.value)} 
+                  disabled={!isNew}
+                  placeholder="#1"
+                  className={cn(
+                    "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white outline-none focus:border-blue-500 font-bold transition-all",
+                    !isNew && "opacity-50 grayscale cursor-not-allowed"
+                  )} 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre de Cuenta</label>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="Ej: Ahorros BCP"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white outline-none focus:border-blue-500 font-bold" 
+                />
+              </div>
+            </div>
+
+            {isNew ? (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Saldo Inicial ({account.currency})</label>
+                <input 
+                  type="number" 
+                  value={initialBalance} 
+                  onChange={e => setInitialBalance(e.target.value)} 
+                  placeholder="0.00"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white outline-none focus:border-blue-500 font-bold" 
+                />
+                <p className="text-[9px] text-slate-500 mt-1 ml-1 uppercase font-bold">* El saldo inicial NO podrá ser editado después.</p>
+              </div>
+            ) : (
+              <div className="space-y-1 opacity-50 grayscale">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Saldo Inicial (Bloqueado)</label>
+                <div className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white font-bold">
+                  {account.initialBalance.toLocaleString()} {account.currency}
+                </div>
+              </div>
+            )}
+
+            <div className={cn("space-y-4 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50 transition-all", !isNew && "opacity-50 grayscale")}>
+              <div className="flex items-center gap-4">
+                 <button 
+                   onClick={() => isNew && setOwnerType('Mias')}
+                   disabled={!isNew}
+                   className={cn(
+                     "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                     ownerType === 'Mias' ? "bg-purple-600 text-white shadow-lg shadow-purple-900/20" : "bg-slate-800 text-slate-500 hover:bg-slate-700",
+                     !isNew && "cursor-not-allowed"
+                   )}
+                 >Mía</button>
+                 <button 
+                   onClick={() => isNew && setOwnerType('Cliente')}
+                   disabled={!isNew}
+                   className={cn(
+                     "flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                     ownerType === 'Cliente' ? "bg-teal-600 text-white shadow-lg shadow-teal-900/20" : "bg-slate-800 text-slate-500 hover:bg-slate-700",
+                     !isNew && "cursor-not-allowed"
+                   )}
+                 >Cliente</button>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre Completo del Dueño</label>
+                <OwnerNamePicker 
+                  value={ownerName} 
+                  ownerType={ownerType}
+                  onSelect={setOwnerName}
+                  disabled={!isNew}
+                />
+              </div>
+            </div>
+
+            <div className={cn("space-y-4 transition-all", !isNew && "opacity-50 grayscale")}>
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <div className="w-1 h-3 bg-blue-500 rounded-full" /> Método de Pago / Plataforma Principal
+              </h3>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-slate-400">Seleccionar Plataforma</label>
+                  <PlatformPicker 
+                    value={platformId}
+                    ownerFilter={ownerType}
+                    disabled={!isNew}
+                    onSelect={(pId, accVal) => {
+                      setPlatformId(pId);
+                      if (accVal) setPlatformValue(accVal);
+                    }}
+                  />
+                </div>
+                {platformId && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-400">ID / Alias / Número en Plataforma</label>
+                    <input 
+                      type="text" 
+                      value={platformValue} 
+                      onChange={e => setPlatformValue(e.target.value)} 
+                      disabled={!isNew}
+                      placeholder="Ej: 78979555, user_binance..."
+                      className={cn(
+                        "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white outline-none focus:border-blue-500 font-mono",
+                        !isNew && "cursor-not-allowed"
+                      )} 
+                    />
+                  </div>
+                )}
+                {isNew && (
+                  <button 
+                    onClick={() => setShowAddPlatformModal(true)}
+                    className="w-full py-2 border border-dashed border-slate-800 rounded-xl text-[10px] font-bold text-slate-500 hover:text-slate-300 hover:border-slate-700 transition-all uppercase tracking-widest"
+                  >
+                    + Nueva Plataforma a la lista
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-800 flex gap-3 shrink-0 bg-slate-900">
+            <button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold tracking-tight transition-all">Guardar Cambios</button>
+            <button onClick={onClose} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold tracking-tight transition-all">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      {showAddPlatformModal && (
+        <MiniAddPlatformModal 
+          store={store}
+          onAdd={() => setShowAddPlatformModal(false)}
+          onClose={() => setShowAddPlatformModal(false)}
+          ownerFilter={ownerType}
+        />
+      )}
+    </>
+  );
+}
+
+function MiniAddPlatformModal({ onAdd, onClose, store, ownerFilter }: { onAdd: (id: string) => void, onClose: () => void, store: any, ownerFilter?: string }) {
+  const [type, setType] = useState<'Fiat' | 'Crypto'>('Fiat');
+  const [name, setName] = useState('');
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100]" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-[100] flex sm:items-center justify-center pointer-events-none p-4">
+        <div className="bg-slate-950 pointer-events-auto border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+             <h3 className="text-white font-black text-xs uppercase tracking-widest">Nueva Plataforma</h3>
+             <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+          </div>
+          <div className="p-5 space-y-4">
+             <div className="space-y-1 text-xs">
+               <label className="text-slate-500 font-bold uppercase tracking-tighter">Tipo de Método</label>
+               <select value={type} onChange={e => setType(e.target.value as 'Fiat' | 'Crypto')} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-emerald-500 appearance-none">
+                 <option value="Fiat">Fiat / Banco</option>
+                 <option value="Crypto">Crypto / Exchange</option>
+               </select>
+             </div>
+             <div className="space-y-1 text-xs">
+                <label className="text-slate-500 font-bold uppercase tracking-tighter">Nombre Comercial</label>
+                <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="Ej: Binance, BCP..." className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-emerald-500" />
+             </div>
+             <button 
+              disabled={!name} 
+              onClick={() => {
+                const id = Date.now().toString();
+                store.addPlatform({ id, type, name, owner: ownerFilter || 'Mias' });
+                onAdd(id);
+              }} 
+              className="w-full bg-emerald-600 disabled:opacity-50 text-white rounded-xl py-3.5 font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-600/20 active:scale-95 transition-all mt-2"
+             >
+               Registrar Plataforma
+             </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -316,7 +584,7 @@ function CapitalModal({ type, onClose }: { type: 'Deposit' | 'Withdrawal', onClo
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
 
-  const accounts = store.accounts.filter(a => a.currency === currency);
+  const accounts = store.accounts.filter(a => a.currency === currency && a.ownerType !== 'Cliente');
 
   React.useEffect(() => {
     if (accounts.length > 0 && (!accountId || !accounts.find(a => a.id === accountId))) {
@@ -361,14 +629,27 @@ function CapitalModal({ type, onClose }: { type: 'Deposit' | 'Withdrawal', onClo
                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
                </div>
                
-               <div className="space-y-1 relative">
+               <div className="space-y-1">
                  <label className="text-xs text-slate-400">Cuenta</label>
-                 <select value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none outline-none focus:border-blue-500 disabled:opacity-50">
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    {accounts.length === 0 && <option value="">Sin cuentas</option>}
-                 </select>
-                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
+                 <AccountPicker 
+                   value={accountId}
+                   currency={currency}
+                   excludeOwner="Cliente"
+                   onSelect={setAccountId}
+                 />
                </div>
+
+               {accountId && (
+                 <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-3 flex items-center justify-between">
+                   <div className="flex items-center gap-2 text-blue-400">
+                     <Wallet className="w-4 h-4" />
+                     <span className="text-xs font-semibold">Saldo Actual</span>
+                   </div>
+                   <div className="text-white font-bold">
+                     {getAccountBalance(accountId, store).toFixed(currency === 'BTC' ? 5 : 2)} {currency}
+                   </div>
+                 </div>
+               )}
 
                <div className="space-y-1">
                  <label className="text-xs text-slate-400">{type === 'Deposit' ? 'Monto a agregar' : 'Monto a retirar'} ({currency})</label>
@@ -391,136 +672,407 @@ function CapitalModal({ type, onClose }: { type: 'Deposit' | 'Withdrawal', onClo
   );
 }
 
-function EditInitialBalance({ account }: { account: any }) {
-  const store = useAppStore();
-  const [isEditing, setIsEditing] = useState(false);
-  const [val, setVal] = useState(account.initialBalance.toString());
+interface PlatformCardProps {
+  platform: any;
+  onRemovePlatform: (id: string) => void;
+  onRemoveAccount: (id: string, idx: number) => void;
+}
 
-  if (isEditing) {
-    return (
-      <input 
-        autoFocus
-        type="number"
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        onBlur={() => {
-          store.updateAccountInitialBalance(account.id, parseFloat(val) || 0);
-          setIsEditing(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-             store.updateAccountInitialBalance(account.id, parseFloat(val) || 0);
-             setIsEditing(false);
-          }
-        }}
-        className="w-full bg-slate-800 border-none rounded py-0.5 px-1 text-white font-bold text-base outline-none"
-      />
-    );
-  }
+const PlatformCard: React.FC<PlatformCardProps> = ({ 
+  platform: p, 
+  onRemovePlatform, 
+  onRemoveAccount 
+}) => {
+  const store = useAppStore();
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const linkedSystemAccounts = store.accounts.filter(a => 
+    a.platformId === p.id || 
+    a.paymentMethods?.some(pm => pm.type === p.id)
+  );
+
+  const accountCount = (p.accounts?.length || 0) + (p.details ? 1 : 0) + linkedSystemAccounts.length;
+
   return (
-    <div className="flex justify-between items-center group cursor-pointer" onClick={() => setIsEditing(true)}>
-       <span className="font-bold text-base text-white">{account.initialBalance.toFixed(2)}</span>
-       <Pencil className="w-3.5 h-3.5 text-slate-500" />
+    <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-sm group">
+      <div 
+        className={cn(
+          "bg-slate-900/40 px-4 py-3 flex items-center justify-between transition-colors cursor-pointer hover:bg-slate-800/40",
+          isExpanded && "border-b border-slate-800/50"
+        )}
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", p.type === 'Fiat' ? "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.5)]")} />
+          <span className="font-bold text-sm text-slate-100">{p.name}</span>
+          <span className={cn(
+            "text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest",
+            p.type === 'Fiat' ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" : "bg-teal-500/10 text-teal-400 border border-teal-500/20"
+          )}>
+            {p.type}
+          </span>
+          <span className="text-[10px] text-slate-500 font-bold ml-1">{accountCount} ctas.</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemovePlatform(p.id);
+            }} 
+            className="text-slate-600 hover:text-red-500 p-2 transition-all hover:bg-red-500/5 rounded-full"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <ChevronDown className={cn("w-4 h-4 text-slate-500 transition-transform duration-300", isExpanded && "rotate-180")} />
+        </div>
+      </div>
+      
+      {isExpanded && (
+        <div className="p-3 space-y-2.5 bg-slate-900/10 animate-in slide-in-from-top-2 duration-200">
+          {/* System Linked Accounts */}
+          {linkedSystemAccounts.map(acc => (
+            <div key={acc.id} className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3.5 flex items-center justify-between group/row hover:bg-blue-500/10 hover:border-blue-500/40 transition-all shadow-sm">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] bg-blue-500 text-white font-black uppercase px-1.5 py-0.5 rounded tracking-widest">Enlazada</span>
+                  <span className="text-xs text-white font-bold">{acc.name}</span>
+                  <span className="text-[9px] text-slate-500 font-bold uppercase">{acc.currency}</span>
+                </div>
+                <div className="flex gap-2">
+                   {acc.paymentMethods?.filter(pm => pm.type === p.id).map(pm => (
+                     <span key={pm.id} className="text-[13px] text-blue-400 font-mono tracking-tight font-medium">{pm.value}</span>
+                   ))}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[10px] font-bold text-white tracking-tight">
+                  {getAccountBalance(acc.id, store).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: acc.currency === 'BTC' ? 5 : 2 })}
+                </span>
+                <span className="text-[8px] text-slate-500 font-black uppercase">Saldo</span>
+              </div>
+            </div>
+          ))}
+
+          {p.details && (
+            <div className="bg-slate-900/50 border border-dashed border-slate-700/50 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] text-slate-500 font-black uppercase tracking-tight">Principal (Legacy)</span>
+                <span className="text-[13px] text-white font-mono tracking-wider">{p.details}</span>
+              </div>
+            </div>
+          )}
+          
+          {p.accounts?.map((acc: any, idx: number) => (
+            <div key={acc.id} className="bg-slate-900 border border-slate-800/50 rounded-xl p-3.5 flex items-center justify-between group/row hover:bg-slate-800/50 hover:border-slate-700 transition-all shadow-sm">
+              <div className="flex flex-col gap-1">
+                {acc.label && <span className="text-[8px] text-blue-500 font-black uppercase tracking-widest">{acc.label}</span>}
+                <span className="text-[13px] text-slate-200 font-mono tracking-tight font-medium">{acc.value}</span>
+              </div>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveAccount(p.id, idx);
+                }} 
+                className="text-slate-600 hover:text-red-400 opacity-0 group-hover/row:opacity-100 transition-all p-1.5 hover:bg-red-400/5 rounded-lg"
+              >
+                <MinusCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          
+          {(!p.accounts || p.accounts.length === 0) && !p.details && linkedSystemAccounts.length === 0 && (
+            <div className="text-center py-6 text-[10px] text-slate-600 font-bold uppercase tracking-widest italic opacity-40">
+              Sin cuentas registradas
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface PlatformGroupProps {
+  title: string;
+  platforms: any[];
+  onRemovePlatform: (id: string) => void;
+  onRemoveAccount: (id: string, idx: number) => void;
+}
+
+const PlatformGroup: React.FC<PlatformGroupProps> = ({ 
+  title, 
+  platforms, 
+  onRemovePlatform, 
+  onRemoveAccount 
+}) => {
+  return (
+    <div>
+      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4 ml-1 flex items-center gap-3">
+        <div className="h-px bg-slate-800 flex-1" />
+        {title} <span className="text-slate-600 font-normal">({platforms.length})</span>
+        <div className="h-px bg-slate-800 flex-1" />
+      </div>
+      <div className="space-y-4">
+        {platforms.map(p => (
+          <PlatformCard 
+            key={p.id} 
+            platform={p} 
+            onRemovePlatform={onRemovePlatform} 
+            onRemoveAccount={onRemoveAccount} 
+          />
+        ))}
+        {platforms.length === 0 && (
+          <div className="text-center py-10 border-2 border-dashed border-slate-800/50 rounded-2xl bg-slate-950/50">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">No hay plataformas registradas</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-4">
-      <h2 className="text-sm font-semibold mb-4 text-slate-200">
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
-
-function InitialBalanceModal({ onClose }: { onClose: () => void }) {
+function TransferModal({ currency: initialCurrency, onClose }: { currency: string, onClose: () => void }) {
   const store = useAppStore();
+  const [currency, setCurrency] = useState(initialCurrency || store.baseCrypto);
+  const [sourceAccountId, setSourceAccountId] = useState('');
+  const [destAccountId, setDestAccountId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [commissions, setCommissions] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    setSourceAccountId('');
+    setDestAccountId('');
+  }, [currency]);
+
+  const addCommission = () => {
+    setCommissions([...commissions, { name: '', value: 0, type: 'fixed' }]);
+  };
+
+  const updateCommission = (index: number, updates: any) => {
+    const newComs = [...commissions];
+    newComs[index] = { ...newComs[index], ...updates };
+    setCommissions(newComs);
+  };
+
+  const removeCommission = (index: number) => {
+    setCommissions(commissions.filter((_, i) => i !== index));
+  };
+
+  const handleSave = () => {
+    if (!sourceAccountId || !destAccountId || !amount || sourceAccountId === destAccountId) return;
+    
+    store.addTransfer({
+      id: Date.now().toString(),
+      sourceAccountId,
+      destAccountId,
+      amount: parseFloat(amount) || 0,
+      commissions: commissions.map(c => ({
+        name: c.name,
+        value: parseFloat(c.value) || 0,
+        type: c.type as 'fixed' | 'percentage'
+      })),
+      date: new Date().toISOString(),
+      notes
+    });
+    onClose();
+  };
+
+  const totalCommissions = commissions.reduce((acc, c) => {
+    const val = parseFloat(c.value) || 0;
+    if (c.type === 'percentage') {
+      return acc + (parseFloat(amount) || 0) * (val / 100);
+    }
+    return acc + val;
+  }, 0);
+
+  const totalCost = (parseFloat(amount) || 0) + totalCommissions;
 
   return (
     <>
       <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50" onClick={onClose} />
       <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50 flex sm:items-center justify-center pointer-events-none sm:p-4">
-         <div className="bg-slate-950 pointer-events-auto sm:border border-t border-slate-800 w-full max-w-md max-h-[90vh] sm:max-h-[85vh] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-300">
-            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900 shrink-0">
-              <h2 className="text-lg font-bold text-white">Modificar Saldo Inicial</h2>
-              <button onClick={onClose} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full transition-colors">
+         <div className="bg-slate-900 pointer-events-auto sm:border border-t border-slate-800 w-full max-w-md max-h-[90vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5 text-blue-500" /> Transferir {currency}
+              </h2>
+              <button onClick={onClose} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 touch-pan-y">
-               <p className="text-sm text-slate-400">
-                 Configura el saldo inicial de cada cuenta. Puedes agregar más cuentas o monedas con el botón "+".
-               </p>
-               
-               {store.accounts.map((acc) => (
-                  <div key={acc.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
-                     <div className="flex items-center gap-3">
-                       <div className="flex-1 space-y-1 relative">
-                         <label className="text-xs text-slate-400">Moneda</label>
-                         <select 
-                           value={acc.currency} 
-                           onChange={(e) => store.updateAccount(acc.id, { currency: e.target.value })}
-                           className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white appearance-none outline-none focus:border-blue-500"
-                         >
-                           {store.currencies.map(c => <option key={c.symbol} value={c.symbol}>{c.symbol}</option>)}
-                         </select>
-                         <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[34px] pointer-events-none" />
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y pt-6">
+               <div className="space-y-1 relative">
+                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Moneda</label>
+                 <select 
+                   value={currency} 
+                   onChange={e => setCurrency(e.target.value)} 
+                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none outline-none focus:border-blue-500 font-bold"
+                 >
+                   {store.currencies.map(c => <option key={c.symbol} value={c.symbol}>{c.symbol}</option>)}
+                 </select>
+                 <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-[38px] pointer-events-none" />
+               </div>
+
+               <div className="space-y-4 bg-slate-950/50 p-4 rounded-2xl border border-slate-800/50">
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cuenta de Origen</label>
+                   <AccountPicker 
+                     value={sourceAccountId}
+                     currency={currency}
+                     excludeId={destAccountId}
+                     excludeOwner="Cliente"
+                     onSelect={setSourceAccountId}
+                   />
+                 </div>
+                 
+                 <div className="flex justify-center -my-2 relative z-10">
+                   <div className="bg-slate-900 p-2 rounded-full border border-slate-800 shadow-xl">
+                     <ChevronDown className="w-4 h-4 text-blue-500" />
+                   </div>
+                 </div>
+
+                 <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cuenta de Destino</label>
+                   <AccountPicker 
+                     value={destAccountId}
+                     currency={currency}
+                     excludeId={sourceAccountId}
+                     excludeOwner="Cliente"
+                     onSelect={setDestAccountId}
+                   />
+                 </div>
+               </div>
+
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Monto a Transferir</label>
+                 <div className="relative">
+                   <input 
+                     type="number" 
+                     value={amount} 
+                     onChange={e => setAmount(e.target.value)} 
+                     placeholder="0.00" 
+                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-4 text-white outline-none focus:border-blue-500 font-black text-2xl tracking-tighter" 
+                   />
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">{currency}</span>
+                 </div>
+               </div>
+
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Comisiones / Fees</label>
+                   <button 
+                    onClick={addCommission}
+                    className="text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-blue-400 transition-colors"
+                   >
+                     + Agregar Comisión
+                   </button>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   {commissions.map((c, idx) => (
+                     <div key={idx} className="flex gap-2 items-start bg-slate-950/30 p-2 rounded-xl border border-slate-800/50 group">
+                       <div className="flex-1 space-y-1">
+                         <input 
+                           type="text" 
+                           placeholder="Nombre (ej: Red, Gas...)" 
+                           value={c.name}
+                           onChange={e => updateCommission(idx, { name: e.target.value })}
+                           className="w-full bg-transparent border-none text-xs text-white placeholder:text-slate-700 outline-none font-bold"
+                         />
+                         <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              placeholder="0.00" 
+                              value={c.value || ''}
+                              onChange={e => updateCommission(idx, { value: e.target.value })}
+                              className="bg-transparent border-none text-sm text-blue-400 font-black outline-none w-20"
+                            />
+                            <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-800">
+                               <button 
+                                 onClick={() => updateCommission(idx, { type: 'percentage' })}
+                                 className={cn(
+                                   "px-2 py-1 rounded text-[10px] font-black transition-all",
+                                   c.type === 'percentage' ? "bg-blue-600 text-white" : "text-slate-500 hover:text-slate-300"
+                                 )}
+                               >%</button>
+                               <button 
+                                 onClick={() => updateCommission(idx, { type: 'fixed' })}
+                                 className={cn(
+                                   "px-3 py-1 rounded text-[10px] font-black transition-all",
+                                   c.type === 'fixed' ? "bg-blue-600 text-white" : "text-slate-500 hover:text-slate-300"
+                                 )}
+                               >#</button>
+                            </div>
+                         </div>
                        </div>
-                       <button onClick={() => {
-                          store.removeAccount(acc.id);
-                       }} className="mt-5 w-12 h-12 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-lg text-slate-500 hover:text-red-500 shrink-0">
-                         <X className="w-5 h-5" />
+                       <button onClick={() => removeCommission(idx)} className="p-2 text-slate-700 hover:text-red-500 transition-colors">
+                         <Trash2 className="w-4 h-4" />
                        </button>
                      </div>
+                   ))}
+                 </div>
+               </div>
 
-                     <div className="space-y-1 text-xs">
-                       <label className="text-slate-400">Nombre de la Cuenta</label>
-                       <input 
-                         type="text" 
-                         value={acc.name} 
-                         onChange={(e) => store.updateAccount(acc.id, { name: e.target.value })}
-                         placeholder="Ej: Cuenta 1, Binance, BCP..."
-                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 text-base" 
-                       />
+               {amount && (
+                 <div className="bg-blue-600/5 rounded-2xl border border-blue-500/10 p-4 space-y-3">
+                   <div className="flex justify-between text-xs">
+                     <span className="text-slate-500 font-bold uppercase tracking-widest">Resumen</span>
+                   </div>
+                   <div className="space-y-1 pt-2 border-t border-blue-500/10">
+                     <div className="flex justify-between items-center text-sm font-bold">
+                       <span className="text-slate-400">Total Comisiones</span>
+                       <span className="text-amber-500">{totalCommissions.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
                      </div>
-                     
-                     <div className="space-y-1 text-xs">
-                       <label className="text-slate-400">Saldo inicial ({acc.currency})</label>
-                       <input 
-                         type="number" 
-                         value={acc.initialBalance} 
-                         onChange={(e) => store.updateAccountInitialBalance(acc.id, parseFloat(e.target.value) || 0)}
-                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 text-base font-bold" 
-                       />
-                       {acc.currency === store.baseCrypto && (
-                         <p className="text-[10px] text-slate-500 mt-1">Esta es tu moneda principal. Aparecerá destacada en el encabezado.</p>
-                       )}
+                     <div className="flex justify-between items-center text-lg font-black pt-1">
+                       <span className="text-white">Costo Total</span>
+                       <span className="text-blue-500">{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}</span>
                      </div>
-                  </div>
-               ))}
+                     <p className="text-[10px] text-slate-500 text-right font-bold uppercase">* Se descontará de la cuenta de origen</p>
+                   </div>
+                 </div>
+               )}
 
-               <button onClick={() => {
-                  const defaultCurrency = store.currencies[0]?.symbol || 'USDT';
-                  const counts = store.accounts.filter(a => a.currency === defaultCurrency).length;
-                  store.addAccount({ id: Date.now().toString(), currency: defaultCurrency, name: `Cuenta ${counts + 1}`, initialBalance: 0 });
-               }} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 hover:text-white hover:border-slate-700 hover:bg-slate-900 transition-colors flex items-center justify-center gap-2">
-                  <Plus className="w-5 h-5" /> Agregar Cuenta
-               </button>
-               
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Notas (opcional)</label>
+                 <textarea 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  placeholder="Detalle de la transferencia..." 
+                  className="w-full h-20 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500 resize-none text-sm font-medium" 
+                 />
+               </div>
             </div>
 
-            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-800 bg-slate-900 shrink-0">
-               <button onClick={onClose} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-colors">
-                 Listo
+            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-800 flex gap-3 shrink-0 bg-slate-900">
+               <button 
+                onClick={handleSave} 
+                disabled={!sourceAccountId || !destAccountId || !amount} 
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-900/20 transition-all active:scale-95"
+               >
+                 Confirmar Transferencia
                </button>
+               <button onClick={onClose} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Cancelar</button>
             </div>
-
          </div>
       </div>
     </>
   );
 }
+
+function SectionCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800/60 rounded-2xl overflow-hidden p-5 shadow-xl shadow-black/20">
+      <h2 className="text-[12px] font-black uppercase tracking-[0.15em] mb-6 flex items-center gap-3 text-slate-400">
+        <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 shadow-inner">
+          {icon || <div className="w-1.5 h-1.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]" />}
+        </div>
+        {title}
+      </h2>
+      <div className="relative z-10">
+        {children}
+      </div>
+    </div>
+  );
+}
+
