@@ -12,12 +12,15 @@ import { Balance } from './views/Balance';
 import { Statistics } from './views/Statistics';
 import { Gestor } from './views/Gestor';
 import { Documentation } from './views/Documentation';
+import { SyncManager } from './components/SyncManager';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('simulador');
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+    <>
+      <SyncManager />
+      <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
       {activeTab === 'historial' && <History />}
       {activeTab === 'balance' && <Balance />}
@@ -26,6 +29,7 @@ export default function App() {
       {activeTab === 'ajustes' && <Gestor onNavigate={setActiveTab} />}
       {activeTab === 'documentacion' && <Documentation onBack={() => setActiveTab('ajustes')} />}
     </Layout>
+    </>
   );
 }
 

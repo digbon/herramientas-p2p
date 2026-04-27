@@ -93,6 +93,10 @@ export type AppState = {
   operations: Operation[];
   movements: Movement[];
   transfers: Transfer[];
+  driveFolderId: string | null;
+  driveFolderName: string | null;
+  isAutoSyncEnabled: boolean;
+  setDriveSettings: (folderId: string | null, folderName: string | null, autoSync: boolean) => void;
   setBaseFiat: (fiat: string) => void;
   setBaseCrypto: (crypto: string) => void;
   addCurrency: (currency: Currency) => void;
@@ -124,6 +128,14 @@ export const useAppStore = create<AppState>()(
       operations: [],
       movements: [],
       transfers: [],
+      driveFolderId: null,
+      driveFolderName: null,
+      isAutoSyncEnabled: false,
+      setDriveSettings: (folderId, folderName, autoSync) => set({ 
+        driveFolderId: folderId, 
+        driveFolderName: folderName, 
+        isAutoSyncEnabled: autoSync 
+      }),
       setBaseFiat: (fiat) => set({ baseFiat: fiat }),
       setBaseCrypto: (crypto) => set({ baseCrypto: crypto }),
       addCurrency: (currency) => set((state) => ({ currencies: [...state.currencies, currency] })),

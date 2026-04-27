@@ -8,30 +8,56 @@ import { driveService, GoogleDriveFile } from '../lib/googleDrive';
 
 export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const store = useAppStore();
-  const [isDriveAuth, setIsDriveAuth] = useState(false);
+  const [isDriveAuth, setIsDriveAuth] = useState(driveService.isAuthenticated());
   const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [driveFolders, setDriveFolders] = useState<GoogleDriveFile[]>([]);
   const [isLoadingDrive, setIsLoadingDrive] = useState(false);
+  const [isShowingFolderPicker, setIsShowingFolderPicker] = useState(false);
 
   useEffect(() => {
-    driveService.init();
-    
     const handleAuth = () => {
       setIsDriveAuth(true);
-      loadDriveFiles();
+      loadDriveData();
     };
+    
+    if (driveService.isAuthenticated()) {
+      handleAuth();
+    }
     
     window.addEventListener('googledrive_auth_success', handleAuth);
     return () => window.removeEventListener('googledrive_auth_success', handleAuth);
   }, []);
 
-  const loadDriveFiles = async () => {
+  const loadDriveData = async () => {
     if (!driveService.isAuthenticated()) return;
     setIsLoadingDrive(true);
     try {
-      const files = await driveService.listBackups();
+      const [files, folders] = await Promise.all([
+        driveService.listBackups(store.driveFolderId),
+        driveService.listFolders()
+      ]);
       setDriveFiles(files);
+      setDriveFolders(folders);
     } catch (error) {
-      console.error('Error loading drive files:', error);
+      console.error('Error loading drive data:', error);
+    } finally {
+      setIsLoadingDrive(false);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    const name = prompt('Nombre de la nueva carpeta:', 'P2P Tools Backups');
+    if (!name) return;
+    
+    setIsLoadingDrive(true);
+    try {
+      const folderId = await driveService.createFolder(name);
+      store.setDriveSettings(folderId, name, store.isAutoSyncEnabled);
+      await loadDriveData();
+      setIsShowingFolderPicker(false);
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      alert('Error al crear la carpeta.');
     } finally {
       setIsLoadingDrive(false);
     }
@@ -77,9 +103,9 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `p2p-backup-${new Date().toISOString().slice(0, 10)}.zip`;
       
-      await driveService.uploadBackup(blob, filename);
+      await driveService.uploadBackup(blob, filename, store.driveFolderId);
       alert('¡Copia de seguridad subida a Google Drive con éxito!');
-      loadDriveFiles();
+      loadDriveData();
     } catch (error) {
       console.error('Error in cloud backup:', error);
       alert('Error al subir la copia a la nube.');
@@ -264,11 +290,106 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
                 onClick={() => {
                   driveService.logout();
                   setIsDriveAuth(false);
+                  store.setDriveSettings(null, null, false);
                 }}
                 className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
               >
                 <LogOut className="w-4 h-4" />
               </button>
+            </div>
+
+            <div className="space-y-3 p-4 bg-slate-950 border border-slate-800 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carpeta de Sincronización</label>
+                <button 
+                  onClick={() => setIsShowingFolderPicker(!isShowingFolderPicker)}
+                  className="text-[10px] font-black text-blue-400 uppercase tracking-widest hover:text-blue-300 transition-colors"
+                >
+                  {store.driveFolderId ? 'Cambiar' : 'Seleccionar'}
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-800">
+                  <FolderUp className="w-5 h-5 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-white truncate">
+                    {store.driveFolderName || 'Sin carpeta seleccionada'}
+                  </div>
+                  <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                    {store.driveFolderId ? 'Ruta activa' : 'Se creará en la raíz por defecto'}
+                  </div>
+                </div>
+              </div>
+
+              {isShowingFolderPicker && (
+                <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Tus carpetas en Drive</span>
+                    <button 
+                      onClick={handleCreateFolder}
+                      className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Nueva
+                    </button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                    {driveFolders.length === 0 ? (
+                      <p className="text-[10px] text-slate-600 italic text-center py-2">No se encontraron carpetas</p>
+                    ) : (
+                      driveFolders.map(folder => (
+                        <button
+                          key={folder.id}
+                          onClick={() => {
+                            store.setDriveSettings(folder.id, folder.name, store.isAutoSyncEnabled);
+                            setIsShowingFolderPicker(false);
+                            loadDriveData();
+                          }}
+                          className={cn(
+                            "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all truncate",
+                            store.driveFolderId === folder.id ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400 hover:bg-slate-800"
+                          )}
+                        >
+                          {folder.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center border transition-all",
+                      store.isAutoSyncEnabled ? "bg-blue-600/10 border-blue-500/50" : "bg-slate-900 border-slate-800"
+                    )}>
+                      <RefreshCw className={cn("w-5 h-5 transition-all text-slate-500", store.isAutoSyncEnabled && "text-blue-500 animate-spin-slow")} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Sincronización Automática</div>
+                      <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Subir al detectar cambios</div>
+                    </div>
+                  </div>
+                  <div className={cn(
+                    "w-10 h-5 rounded-full transition-all relative flex items-center px-1",
+                    store.isAutoSyncEnabled ? "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]" : "bg-slate-800"
+                  )}>
+                    <input 
+                      type="checkbox" 
+                      className="hidden" 
+                      checked={store.isAutoSyncEnabled}
+                      onChange={(e) => store.setDriveSettings(store.driveFolderId, store.driveFolderName, e.target.checked)}
+                    />
+                    <div className={cn(
+                      "w-3 h-3 bg-white rounded-full transition-all shadow-md",
+                      store.isAutoSyncEnabled ? "translate-x-5" : "translate-x-0"
+                    )} />
+                  </div>
+                </label>
+              </div>
             </div>
 
             <button 
@@ -277,13 +398,13 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
             >
               {isLoadingDrive ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-              {isLoadingDrive ? 'Procesando...' : 'Subir Respaldo Actual'}
+              {isLoadingDrive ? 'Procesando...' : 'Sincronizar ahora'}
             </button>
 
             <div className="pt-2 border-t border-slate-800/50">
               <div className="flex items-center justify-between mb-3 px-1">
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Respaldos en la Nube</h3>
-                <button onClick={loadDriveFiles} className="text-blue-400 hover:text-blue-300 transition-colors">
+                <button onClick={loadDriveData} className="text-blue-400 hover:text-blue-300 transition-colors">
                   <RefreshCw className={cn("w-3.5 h-3.5", isLoadingDrive && "animate-spin")} />
                 </button>
               </div>
@@ -296,9 +417,9 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
                 ) : (
                   driveFiles.map(file => (
                     <div key={file.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between group hover:border-slate-700 transition-colors">
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-xs font-bold text-slate-200 truncate pr-2">{file.name}</span>
-                        <span className="text-[9px] font-medium text-slate-500">{new Date(file.modifiedTime).toLocaleString()}</span>
+                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{new Date(file.modifiedTime).toLocaleString()}</span>
                       </div>
                       <button 
                         onClick={() => handleCloudRestore(file.id)}
