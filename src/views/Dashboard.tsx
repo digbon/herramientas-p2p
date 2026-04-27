@@ -63,7 +63,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
       </div>
 
       {/* Main Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
           label="Balance Fiat Total"
@@ -79,6 +79,22 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           symbol={store.baseCrypto}
           trend="-0.8%"
           color="teal"
+        />
+        <StatCard 
+          icon={<ArrowUpRight className="w-5 h-5 text-blue-400" />}
+          label="Ops. Realizadas"
+          value={store.operations.length.toString()}
+          symbol="U"
+          trend={`${recentOperations.length} hoy`}
+          color="blue"
+        />
+        <StatCard 
+          icon={<Activity className="w-5 h-5 text-amber-400" />}
+          label="Volumen Total"
+          value={(store.operations.reduce((acc, op) => acc + (op.amountInvested || 0), 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          symbol={store.baseFiat}
+          trend="+12%"
+          color="amber"
         />
       </div>
 
@@ -188,7 +204,7 @@ interface StatCardProps {
   value: string;
   symbol: string;
   trend: string;
-  color: 'purple' | 'teal';
+  color: 'purple' | 'teal' | 'blue' | 'amber';
 }
 
 function StatCard({ icon, label, value, symbol, trend, color }: StatCardProps) {
@@ -196,7 +212,10 @@ function StatCard({ icon, label, value, symbol, trend, color }: StatCardProps) {
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden group">
       <div className={cn(
         "absolute -right-8 -top-8 w-32 h-32 rounded-full blur-[60px] opacity-20 transition-opacity group-hover:opacity-30",
-        color === 'purple' ? "bg-purple-600" : "bg-teal-600"
+        color === 'purple' ? "bg-purple-600" : 
+        color === 'teal' ? "bg-teal-600" : 
+        color === 'blue' ? "bg-blue-600" : 
+        "bg-amber-600"
       )} />
       
       <div className="relative space-y-4">

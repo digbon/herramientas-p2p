@@ -32,23 +32,23 @@ export function Balance() {
     <div className="space-y-6 pb-20">
       
       {/* Resumen Superior */}
-      <div className="space-y-4">
-        <div>
-          <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2 uppercase">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2 uppercase px-1">
             <span>Cripto</span>
             <span>{cryptoCurrencies.length} monedas</span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 snap-x scrollbar-hide">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {cryptoCurrencies.map(c => (
-              <div key={c.symbol} className="bg-teal-500/20 border border-teal-500/30 rounded-xl p-4 min-w-[150px] snap-center shrink-0 shadow-lg shadow-teal-500/5">
+              <div key={c.symbol} className="bg-teal-500/20 border border-teal-500/30 rounded-xl p-4 shadow-lg shadow-teal-500/5">
                 <div className="flex justify-between items-center text-teal-300 text-sm font-medium mb-2">
                   <span>Balance</span>
                   <span className="font-bold">{c.symbol}</span>
                 </div>
-                <div className="text-3xl font-bold text-white tracking-tight">
+                <div className="text-2xl font-bold text-white tracking-tight">
                   {getCryptoBalance(c.symbol).toFixed(5).replace(/\.?0+$/, '') || '0.00'}
                 </div>
-                <div className="text-xs text-teal-300/70 mt-1">
+                <div className="text-[10px] text-teal-300/70 mt-1">
                   en {store.paymentMethods.filter((p: PaymentMethod) => p.currency === c.symbol && p.ownerType !== 'Cliente').length} medios
                 </div>
               </div>
@@ -56,22 +56,22 @@ export function Balance() {
           </div>
         </div>
 
-        <div>
-          <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2 uppercase">
+        <div className="space-y-4">
+          <div className="flex justify-between text-xs font-semibold text-slate-500 mb-2 uppercase px-1">
             <span>Fiat</span>
             <span>{fiatCurrencies.length} moneda(s)</span>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 snap-x scrollbar-hide">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
              {fiatCurrencies.map(c => (
-              <div key={c.symbol} className="bg-purple-600 border border-purple-500 rounded-xl p-4 min-w-[150px] snap-center shrink-0 shadow-lg shadow-purple-600/20">
+              <div key={c.symbol} className="bg-purple-600 border border-purple-500 rounded-xl p-4 shadow-lg shadow-purple-600/20">
                  <div className="flex justify-between items-center text-purple-200 text-sm font-medium mb-2">
                   <span>Balance</span>
                   <span className="font-bold">{c.symbol}</span>
                 </div>
-                <div className="text-3xl font-bold text-white tracking-tight">
+                <div className="text-2xl font-bold text-white tracking-tight">
                   {getFiatBalance(c.symbol).toFixed(2)}
                 </div>
-                <div className="text-xs text-purple-200/70 mt-1">
+                <div className="text-[10px] text-purple-200/70 mt-1">
                   en {store.paymentMethods.filter((p: PaymentMethod) => p.currency === c.symbol && p.ownerType !== 'Cliente').length} medios
                 </div>
               </div>
@@ -105,23 +105,23 @@ export function Balance() {
            </button>
         </div>
 
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {store.currencies.map(currency => {
              const pms = store.paymentMethods.filter((p: PaymentMethod) => p.currency === currency.symbol && p.ownerType === 'Mias');
              
              return (
-               <div key={currency.symbol} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
-                 <div className="flex items-center justify-between">
+               <div key={currency.symbol} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4 flex flex-col">
+                 <div className="flex items-center justify-between gap-4">
                    <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-white text-sm shadow-inner group">
+                     <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center font-black text-white text-sm shadow-inner group shrink-0">
                         {currency.symbol.slice(0, 3)}
                      </div>
-                     <div>
+                     <div className="min-w-0">
                        <div className="flex items-center gap-2">
-                         <span className="font-black text-xl text-white tracking-tighter">{currency.symbol}</span>
-                         <span className="text-[10px] font-black bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-widest">{currency.type}</span>
+                         <span className="font-black text-xl text-white tracking-tighter truncate">{currency.symbol}</span>
+                         <span className="text-[10px] font-black bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded uppercase tracking-widest shrink-0">{currency.type}</span>
                        </div>
-                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{pms.length} medios registrados</div>
+                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">{pms.length} medios registrados</div>
                      </div>
                    </div>
                    <button 
@@ -139,14 +139,14 @@ export function Balance() {
                         } as PaymentMethod);
                         setIsNewPM(true);
                       }}
-                     className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95"
+                     className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
                    >
                      <Plus className="w-4 h-4" /> Nuevo Medio
                    </button>
                  </div>
 
-                 {pms.length > 0 && (
-                 <div className="space-y-4">
+                 {pms.length > 0 ? (
+                 <div className="space-y-4 flex-1">
                    {Object.entries(
                      pms.reduce((acc: Record<string, PaymentMethod[]>, pm: PaymentMethod) => {
                        if (!acc[pm.platformChannel]) acc[pm.platformChannel] = [];
@@ -159,7 +159,7 @@ export function Balance() {
                            <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
                            <h3 className="text-white font-bold tracking-tight">{platformName}</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {platformPms.map(pm => (
                              <PaymentMethodCard 
                                key={pm.id} 
@@ -174,13 +174,17 @@ export function Balance() {
                      </div>
                    ))}
                  </div>
+                 ) : (
+                   <div className="flex-1 min-h-[100px] flex items-center justify-center border-2 border-dashed border-slate-800 rounded-xl">
+                      <p className="text-slate-600 text-xs font-bold uppercase tracking-widest">Sin medios para {currency.symbol}</p>
+                   </div>
                  )}
                </div>
              );
           })}
         </div>
 
-        <div className="mt-8 pt-8 border-t border-slate-800 space-y-6">
+        <div className="mt-8 pt-8 border-t border-slate-800 grid grid-cols-1 lg:grid-cols-2 gap-8">
           <SectionCard title="Configuración de Entorno">
             <div className="space-y-4">
               <div className="space-y-1 relative">
@@ -234,11 +238,11 @@ export function Balance() {
                 <input 
                   type="text" 
                   placeholder="Ej: ARS" 
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 uppercase font-black"
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500 uppercase font-black"
                   value={newCurrency}
                   onChange={e => setNewCurrency(e.target.value.toUpperCase())}
                 />
-                <div className="relative">
+                <div className="relative shrink-0">
                   <select 
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3 pr-8 py-2.5 text-sm text-white outline-none focus:border-blue-500 appearance-none font-bold"
                     value={newCurrencyType}
@@ -256,7 +260,7 @@ export function Balance() {
                       setNewCurrency('');
                     }
                   }}
-                  className="w-11 h-11 bg-blue-600 hover:bg-blue-700 flex items-center justify-center rounded-xl text-white shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
+                  className="w-11 h-11 shrink-0 bg-blue-600 hover:bg-blue-700 flex items-center justify-center rounded-xl text-white shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
                 >
                   <Plus className="w-5 h-5" />
                 </button>

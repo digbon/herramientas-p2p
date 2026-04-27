@@ -13,40 +13,42 @@ export function History() {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="space-y-4 pb-16">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-        <h1 className="text-xl font-bold">Historial</h1>
-      </div>
+    <div className="space-y-6 pb-16">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
+        <h1 className="text-2xl font-black text-white tracking-tight">Historial</h1>
+        
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto">
+          <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-full p-1 w-full sm:w-auto">
+            {['Día', 'Semana', 'Mes', 'Global'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setTimeFilter(tab)}
+                className={cn(
+                  "flex-1 px-4 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-full transition-all",
+                  timeFilter === tab ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
 
-      <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-full p-1">
-        {['Día', 'Semana', 'Mes', 'Global'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setTimeFilter(tab)}
-            className={cn(
-              "flex-1 py-1.5 text-xs font-semibold rounded-full transition-colors",
-              timeFilter === tab ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-300"
-            )}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input 
-            type="text"
-            placeholder="Buscar..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-          />
+          <div className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input 
+                type="text"
+                placeholder="Buscar..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
+              />
+            </div>
+            <button className="bg-slate-900 border border-slate-800 text-slate-500 hover:text-white hover:bg-slate-800 p-2.5 rounded-xl transition-all">
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <button className="bg-slate-900 border border-slate-800 text-slate-400 hover:text-white p-2.5 rounded-lg">
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
       </div>
 
       <div>
@@ -84,7 +86,7 @@ export function History() {
           {listTab === 'Retiros' && store.movements.filter(m => m.type === 'Withdrawal').length === 0 && "No hay retiros."}
           {listTab === 'Transferencias' && store.transfers.length === 0 && "No hay transferencias."}
           
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
              {listTab === 'Transferencias' && store.transfers.map(t => {
                 const sourcePM = store.paymentMethods.find(pm => pm.id === (t.sourcePaymentMethodId || (t as any).sourceAccountId));
                 const destPM = store.paymentMethods.find(pm => pm.id === (t.destPaymentMethodId || (t as any).destAccountId));

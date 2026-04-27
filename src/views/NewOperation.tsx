@@ -242,7 +242,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* PLATAFORMA & CLIENTE INFO */}
-            <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1 relative">
                 <label className="text-xs text-slate-400">Plataforma P2P</label>
                 <OwnerNamePicker value={p2pPlatform} ownerType="Mias" placeholder="Ej: Binance, Airtm..." onSelect={(name) => setP2pPlatform(name)} />
@@ -253,7 +253,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                 <OwnerNamePicker value={clientName} ownerType="Cliente" onSelect={(name) => setClientName(name)} />
               </div>
 
-              <div className="space-y-1 relative">
+              <div className="sm:col-span-2 space-y-1 relative">
                 <label className="text-xs text-slate-400">ID o identificador de usuario</label>
                 <input type="text" value={clientIdPlatform} onChange={(e) => setClientIdPlatform(e.target.value)} placeholder="Ej: user1234" className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500" />
               </div>

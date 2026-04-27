@@ -173,153 +173,165 @@ export function Simulator() {
           Próximamente: vista de {activeTab}
         </div>
       ) : (
-        <div className="space-y-4">
-          <Section title={<span className="flex items-center gap-2"><DollarSign className="w-4 h-4 text-blue-500" /> Monedas y Monto</span>}>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Moneda Origen</label>
-                <select
-                  value={sourceCurrency}
-                  onChange={(e) => setSourceCurrency(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                >
-                  {currencies.map(c => (
-                    <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
-                  ))}
-                </select>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20 lg:pb-8">
+          <div className="flex flex-col gap-4">
+            <Section title={<span className="flex items-center gap-2 tracking-widest uppercase font-black text-[10px] text-slate-500"><DollarSign className="w-3.5 h-3.5 text-blue-500" /> Monedas y Monto</span>}>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Moneda Origen</label>
+                  <select
+                    value={sourceCurrency}
+                    onChange={(e) => setSourceCurrency(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-bold"
+                  >
+                    {currencies.map(c => (
+                      <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Moneda Destino</label>
+                  <select
+                    value={destCurrency}
+                    onChange={(e) => setDestCurrency(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-bold"
+                  >
+                    {currencies.map(c => (
+                      <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-slate-400 font-medium">Moneda Destino</label>
-                <select
-                  value={destCurrency}
-                  onChange={(e) => setDestCurrency(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                >
-                  {currencies.map(c => (
-                    <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-slate-400">Cantidad a invertir ({sourceCurrency})</label>
-              <input
-                type="number"
-                value={amountSource}
-                onChange={(e) => setAmountSource(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-bold"
-              />
-            </div>
-          </Section>
-
-          <Section title={<span className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-red-500" /> Detalles de Compra</span>}>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">Precio ({destCurrency}/{sourceCurrency})</label>
+                <label className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Cantidad a invertir ({sourceCurrency})</label>
                 <input
                   type="number"
-                  value={buyPrice}
-                  onChange={(e) => setBuyPrice(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                  value={amountSource}
+                  onChange={(e) => setAmountSource(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 font-black text-lg"
                 />
               </div>
-              
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-slate-400 font-medium">Comisiones de Compra</label>
-                  <button 
-                    onClick={() => handleAddCommission('buy')}
-                    className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 uppercase tracking-widest font-bold"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Agregar
-                  </button>
-                </div>
-                {buyCommissions.length === 0 && (
-                  <div className="text-center py-2 text-slate-500 text-xs italic">Sin comisiones</div>
-                )}
-                {buyCommissions.map(c => renderCommission('buy', c))}
-              </div>
-            </div>
-          </Section>
+            </Section>
 
-          <Section title={<span className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-emerald-500" /> Detalles de Venta</span>}>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-400">Precio ({destCurrency}/{sourceCurrency})</label>
-                <input
-                  type="number"
-                  value={sellPrice}
-                  onChange={(e) => setSellPrice(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-slate-400 font-medium">Comisiones de Venta</label>
-                  <button 
-                    onClick={() => handleAddCommission('sell')}
-                    className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 uppercase tracking-widest font-bold"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Agregar
-                  </button>
+            <Section title={<span className="flex items-center gap-2 tracking-widest uppercase font-black text-[10px] text-slate-500"><TrendingDown className="w-3.5 h-3.5 text-red-500" /> Detalles de Compra</span>}>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Precio ({destCurrency}/{sourceCurrency})</label>
+                  <input
+                    type="number"
+                    value={buyPrice}
+                    onChange={(e) => setBuyPrice(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-red-500 font-black"
+                  />
                 </div>
-                {sellCommissions.length === 0 && (
-                  <div className="text-center py-2 text-slate-500 text-xs italic">Sin comisiones</div>
-                )}
-                {sellCommissions.map(c => renderCommission('sell', c))}
+                
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Comisiones de Compra</label>
+                    <button 
+                      onClick={() => handleAddCommission('buy')}
+                      className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 uppercase tracking-widest font-black transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Agregar
+                    </button>
+                  </div>
+                  {buyCommissions.length === 0 ? (
+                    <div className="text-center py-4 bg-slate-950/20 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 text-[10px] font-black uppercase tracking-widest">Sin comisiones</div>
+                  ) : buyCommissions.map(c => renderCommission('buy', c))}
+                </div>
               </div>
-            </div>
-          </Section>
+            </Section>
 
-          <div className={cn(
-            "rounded-xl p-4 border",
-            isProfitable ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
-          )}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={cn("w-2 h-2 rounded-full", isProfitable ? "bg-emerald-500" : "bg-red-500")} />
-              <span className={cn("text-sm font-medium", isProfitable ? "text-emerald-500" : "text-red-500")}>
-                {isProfitable ? 'Operación Rentable (Estimada)' : 'Operación con Pérdida (Estimada)'}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className={cn("text-3xl font-bold", isProfitable ? "text-emerald-500" : "text-red-500")}>
-                {profitDest > 0 ? '+' : ''}{profitDest.toFixed(2)} {destCurrency}
-              </span>
-              <span className={cn("text-sm font-medium", isProfitable ? "text-emerald-500/70" : "text-red-500/70")}>
-                ({profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}%)
-              </span>
-            </div>
+            <Section title={<span className="flex items-center gap-2 tracking-widest uppercase font-black text-[10px] text-slate-500"><TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Detalles de Venta</span>}>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Precio ({destCurrency}/{sourceCurrency})</label>
+                  <input
+                    type="number"
+                    value={sellPrice}
+                    onChange={(e) => setSellPrice(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 font-black"
+                  />
+                </div>
+                
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Comisiones de Venta</label>
+                    <button 
+                      onClick={() => handleAddCommission('sell')}
+                      className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 uppercase tracking-widest font-black transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Agregar
+                    </button>
+                  </div>
+                  {sellCommissions.length === 0 ? (
+                    <div className="text-center py-4 bg-slate-950/20 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 text-[10px] font-black uppercase tracking-widest">Sin comisiones</div>
+                  ) : sellCommissions.map(c => renderCommission('sell', c))}
+                </div>
+              </div>
+            </Section>
           </div>
 
-          <div className="space-y-2">
-            <Accordion title="Detalles de Compra" icon={<div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Precio de Compra:</span> {bPrice.toFixed(4)} {destCurrency}</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Total Comisiones:</span> {totalBuyCommissionDest.toFixed(2)} {destCurrency}</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Total Invertido:</span> {totalInvested.toFixed(2)} {destCurrency}</div>
-                <div className="flex justify-between text-white font-medium mt-1 pt-1 border-t border-slate-800"><span className="text-slate-300">Precio Efectivo Compra:</span> {effectiveBuyPrice.toFixed(4)} {destCurrency}</div>
+          <div className="flex flex-col gap-4">
+            <div className={cn(
+              "rounded-2xl p-6 border transition-all duration-500",
+              isProfitable ? "bg-emerald-500/10 border-emerald-500/30 shadow-lg shadow-emerald-500/5" : "bg-red-500/10 border-red-500/30 shadow-lg shadow-red-500/5"
+            )}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={cn("w-2.5 h-2.5 rounded-full animate-pulse", isProfitable ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]")} />
+                <span className={cn("text-xs font-black uppercase tracking-widest", isProfitable ? "text-emerald-500" : "text-red-500")}>
+                  {isProfitable ? 'Operación Rentable' : 'Operación con Pérdida'}
+                </span>
               </div>
-            </Accordion>
-            <Accordion title="Detalles de Venta" icon={<div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}>
-               <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Precio de Venta:</span> {sPrice.toFixed(4)} {destCurrency}</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Total Comisiones:</span> {totalSellCommissionDest.toFixed(2)} {destCurrency}</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Total Recibido:</span> {totalReceived.toFixed(2)} {destCurrency}</div>
-                <div className="flex justify-between text-white font-medium mt-1 pt-1 border-t border-slate-800"><span className="text-slate-300">Precio Efectivo Venta:</span> {effectiveSellPrice.toFixed(4)} {destCurrency}</div>
+              <div className="flex items-baseline gap-3">
+                <span className={cn("text-5xl font-black tracking-tighter", isProfitable ? "text-emerald-500" : "text-red-500")}>
+                  {profitDest > 0 ? '+' : ''}{profitDest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-xl font-bold text-slate-500">{destCurrency}</span>
               </div>
-            </Accordion>
-            <Accordion title="Información Adicional" icon={<Settings2 className="w-4 h-4 text-slate-400 shrink-0" />}>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">P. Equilibrio Venta:</span> {isFinite(exactBreakEvenSellPrice) && exactBreakEvenSellPrice > 0 ? exactBreakEvenSellPrice.toFixed(4) : 'N/A'} {destCurrency}</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Margen sobre P. Compra:</span> {markupOnBuy.toFixed(2)}%</div>
-                <div className="h-px bg-slate-800 my-2" />
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Precio Prom. Compra Histórico:</span> N/A</div>
-                <div className="flex justify-between text-slate-400"><span className="text-slate-300">Precio Prom. Venta Histórico:</span> N/A</div>
+              <div className={cn("mt-2 text-lg font-black", isProfitable ? "text-emerald-500/60" : "text-red-500/60")}>
+                {profitPercentage > 0 ? '+' : ''}{profitPercentage.toFixed(2)}% de retorno
               </div>
-            </Accordion>
+            </div>
+
+            <div className="space-y-3">
+              <Accordion title="Detalles de Compra" icon={<div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)] shrink-0" />}>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Precio de Compra:</span> <span className="font-mono text-white">{bPrice.toFixed(4)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Total Comisiones:</span> <span className="font-mono text-red-500">-{totalBuyCommissionDest.toFixed(2)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Total Invertido:</span> <span className="font-mono text-white">{totalInvested.toFixed(2)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-white font-black mt-2 pt-2 border-t border-slate-800"><span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Precio Efectivo:</span> <span className="text-lg">{effectiveBuyPrice.toFixed(4)} {destCurrency}</span></div>
+                </div>
+              </Accordion>
+              
+              <Accordion title="Detalles de Venta" icon={<div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)] shrink-0" />}>
+                 <div className="space-y-3 text-sm">
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Precio de Venta:</span> <span className="font-mono text-white">{sPrice.toFixed(4)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Total Comisiones:</span> <span className="font-mono text-red-500">-{totalSellCommissionDest.toFixed(2)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-slate-500"><span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Total Recibido:</span> <span className="font-mono text-white">{totalReceived.toFixed(2)} {destCurrency}</span></div>
+                  <div className="flex justify-between text-white font-black mt-2 pt-2 border-t border-slate-800"><span className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Precio Efectivo:</span> <span className="text-lg">{effectiveSellPrice.toFixed(4)} {destCurrency}</span></div>
+                </div>
+              </Accordion>
+
+              <Accordion title="Indicadores Avanzados" icon={<Settings2 className="w-4 h-4 text-slate-400 shrink-0" />}>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between text-slate-500">
+                    <span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">P. Equilibrio (Break-even):</span> 
+                    <span className="font-mono text-amber-500 font-bold">{isFinite(exactBreakEvenSellPrice) && exactBreakEvenSellPrice > 0 ? exactBreakEvenSellPrice.toFixed(4) : 'N/A'} {destCurrency}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span className="text-slate-300 font-bold uppercase text-[10px] tracking-widest">Spread / Marcaje:</span> 
+                    <span className={cn("font-bold", markupOnBuy > 0 ? "text-blue-400" : "text-slate-500")}>{markupOnBuy.toFixed(2)}%</span>
+                  </div>
+                  <div className="h-px bg-slate-800/50 my-2" />
+                  <div className="text-[10px] text-slate-500 italic text-center pb-1">
+                    Úsalo para verificar la viabilidad de tus anuncios Maker.
+                  </div>
+                </div>
+              </Accordion>
+            </div>
           </div>
         </div>
       )}
