@@ -18,7 +18,7 @@ export default function App() {
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab === 'dashboard' && <Dashboard />}
+      {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
       {activeTab === 'historial' && <History />}
       {activeTab === 'balance' && <Balance />}
       {activeTab === 'estadisticas' && <Statistics />}

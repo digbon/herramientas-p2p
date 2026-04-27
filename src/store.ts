@@ -7,48 +7,29 @@ export type Currency = {
   isPrincipal?: boolean;
 };
 
+export type InfoRecord = {
+  id: string;
+  date: string;
+  content: string;
+};
+
 export type PaymentMethod = {
   id: string;
-  type: string;
-  value: string;
-  label: string;
-};
-
-export type Account = {
-  id: string;
+  orderNumber: number; // #1, 2, 3...
+  platformChannel: string; // Plataforma/Canal
+  ownerName: string; // Nombre completo del propietario
+  platformUserId: string; // ID de usuario de la plataforma
   currency: string;
-  tag: string; // e.g. #1, #2, #3
-  name: string;
-  ownerType: 'Mias' | 'Cliente';
-  ownerName: string; // Full name of the owner
   initialBalance: number;
-  platformId?: string;
-  platformValue?: string; // The ID/Alias/Number in that platform
-  details?: string;
-  clientContact?: string;
-  paymentMethods?: PaymentMethod[];
-};
-
-export type PlatformAccount = {
-  id: string;
-  value: string;
-  label?: string;
-};
-
-export type Platform = {
-  id: string;
-  owner?: 'Mias' | 'Cliente';
-  type: 'Fiat' | 'Crypto';
-  name: string;
-  details?: string; // keeping for backward compatibility
-  accounts?: PlatformAccount[];
+  ownerType: 'Mias' | 'Cliente'; // Assuming we still need to know whose it is
+  additionalInfo: InfoRecord[];
 };
 
 export type Movement = {
   id: string;
   type: 'Deposit' | 'Withdrawal';
   currency: string;
-  accountId: string;
+  paymentMethodId: string;
   amount: number;
   notes?: string;
   date: string;
@@ -70,59 +51,45 @@ export type Operation = {
   id: string;
   type: 'Compra' | 'Venta';
   order: 'Maker' | 'Taker';
+
   sourceCurrency: string;
-  sourceMyPlatformId?: string;
-  sourceMyAccountId?: string;
-  sourceClientPlatformId?: string;
-  sourceClientAccountId?: string;
   destCurrency: string;
-  destMyPlatformId?: string;
-  destMyAccountId?: string;
-  destClientPlatformId?: string;
-  destClientAccountId?: string;
-  counterpartName: string;
-  counterpartContact?: string;
-  amountSent: number;
+  amountInvested: number;
   price: number;
   amountReceived: number;
-  commissionsSent: Commission[];
-  commissionsReceived: Commission[];
+
+  commissions: Commission[];
+
+  p2pPlatform: string;
+
+  sourceMyPaymentMethodId?: string;
+  destMyPaymentMethodId?: string;
+
+  clientName: string;
+  clientIdPlatform: string;
+  sourceClientPaymentMethodId?: string;
+  destClientPaymentMethodId?: string;
+
   notes?: string;
   date: string;
   attachments?: Attachment[];
-  // Keep older fields for compatibility if needed, but we'll focus on the new ones
-  sourceAccountId?: string;
-  sourcePlatformId?: string;
-  clientDestAccountId?: string;
-  destAccountId?: string;
-  destPlatformId?: string;
-  clientSourceAccountId?: string;
 };
 
 export type Transfer = {
   id: string;
-  sourceAccountId: string;
-  destAccountId: string;
+  sourcePaymentMethodId: string;
+  destPaymentMethodId: string;
   amount: number;
   commissions: Commission[];
   date: string;
   notes?: string;
 };
 
-export type Client = {
-  id: string;
-  name: string;
-  contact?: string;
-  createdAt: string;
-};
-
 export type AppState = {
   baseFiat: string;
   baseCrypto: string;
   currencies: Currency[];
-  accounts: Account[];
-  clients: Client[];
-  platforms: Platform[];
+  paymentMethods: PaymentMethod[];
   operations: Operation[];
   movements: Movement[];
   transfers: Transfer[];
@@ -130,15 +97,8 @@ export type AppState = {
   setBaseCrypto: (crypto: string) => void;
   addCurrency: (currency: Currency) => void;
   removeCurrency: (symbol: string) => void;
-  addAccount: (account: Account) => void;
-  updateAccountInitialBalance: (id: string, balance: number) => void;
-  updateAccount: (id: string, updates: Partial<Account>) => void;
-  removeAccount: (id: string) => void;
-  addClient: (client: Client) => void;
-  updateClient: (id: string, updates: Partial<Client>) => void;
-  addPlatform: (platform: Platform) => void;
-  updatePlatform: (id: string, updates: Partial<Platform>) => void;
-  removePlatform: (id: string) => void;
+  addPaymentMethod: (pm: PaymentMethod) => string;
+  addPaymentMethodInfo: (pmId: string, info: InfoRecord) => void;
   addOperation: (operation: Operation) => void;
   addMovement: (movement: Movement) => void;
   addTransfer: (transfer: Transfer) => void;
@@ -158,18 +118,8 @@ export const useAppStore = create<AppState>()(
         { symbol: 'USD', type: 'Fiat' },
         { symbol: 'USDC', type: 'Crypto' },
       ],
-      accounts: [
-        { id: '1', currency: 'USDT', tag: '#1', name: 'Cuenta Principal', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 180, platformId: '3' },
-        { id: '2', currency: 'USDT', tag: '#2', name: 'Cuenta Secundaria', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 20, platformId: '3' },
-        { id: '3', currency: 'BOB', tag: '#1', name: 'Ahorros BCP', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 950, platformId: '2' },
-        { id: '4', currency: 'BTC', tag: '#1', name: 'Binance BTC', ownerType: 'Mias', ownerName: 'Yo', initialBalance: 0.00123, platformId: '3' },
-      ],
-      clients: [],
-      platforms: [
-        { id: '1', owner: 'Mias', type: 'Fiat', name: 'YapeBolivia', details: '78979555' },
-        { id: '2', owner: 'Mias', type: 'Fiat', name: 'BCP' },
-        { id: '3', owner: 'Mias', type: 'Crypto', name: 'Binance', details: 'jpbon' },
-        { id: '4', owner: 'Cliente', type: 'Crypto', name: 'Bybit' },
+      paymentMethods: [
+        // Migrate or seed initial
       ],
       operations: [],
       movements: [],
@@ -178,23 +128,18 @@ export const useAppStore = create<AppState>()(
       setBaseCrypto: (crypto) => set({ baseCrypto: crypto }),
       addCurrency: (currency) => set((state) => ({ currencies: [...state.currencies, currency] })),
       removeCurrency: (symbol) => set((state) => ({ currencies: state.currencies.filter(c => c.symbol !== symbol) })),
-      addAccount: (account) => set((state) => ({ accounts: [...state.accounts, account] })),
-      updateAccountInitialBalance: (id, balance) => set((state) => ({
-        accounts: state.accounts.map(a => a.id === id ? { ...a, initialBalance: balance } : a)
+      addPaymentMethod: (pm) => {
+        let savedId = pm.id || Date.now().toString();
+        set((state) => {
+          const globalOrder = state.paymentMethods.filter(p => p.ownerType === pm.ownerType).length + 1;
+          const newPM = { ...pm, id: savedId, orderNumber: pm.orderNumber || globalOrder };
+          return { paymentMethods: [...state.paymentMethods, newPM] };
+        });
+        return savedId;
+      },
+      addPaymentMethodInfo: (pmId, info) => set((state) => ({
+        paymentMethods: state.paymentMethods.map(pm => pm.id === pmId ? { ...pm, additionalInfo: [...pm.additionalInfo, info] } : pm)
       })),
-      updateAccount: (id, updates) => set((state) => ({
-        accounts: state.accounts.map(a => a.id === id ? { ...a, ...updates } : a)
-      })),
-      removeAccount: (id) => set((state) => ({ accounts: state.accounts.filter(a => a.id !== id) })),
-      addClient: (client) => set((state) => ({ clients: [...state.clients, client] })),
-      updateClient: (id, updates) => set((state) => ({
-        clients: state.clients.map(c => c.id === id ? { ...c, ...updates } : c)
-      })),
-      addPlatform: (platform) => set((state) => ({ platforms: [...state.platforms, platform] })),
-      updatePlatform: (id, updates) => set((state) => ({
-        platforms: state.platforms.map(p => p.id === id ? { ...p, ...updates } : p)
-      })),
-      removePlatform: (id) => set((state) => ({ platforms: state.platforms.filter(p => p.id !== id) })),
       addOperation: (operation) => set((state) => ({ operations: [...state.operations, operation] })),
       addMovement: (movement) => set((state) => ({ movements: [...state.movements, movement] })),
       addTransfer: (transfer) => set((state) => ({ transfers: [...state.transfers, transfer] })),
@@ -208,9 +153,7 @@ export const useAppStore = create<AppState>()(
           { symbol: 'USD', type: 'Fiat' },
           { symbol: 'USDC', type: 'Crypto' },
         ],
-        accounts: [],
-        clients: [],
-        platforms: [],
+        paymentMethods: [],
         operations: [],
         movements: [],
         transfers: [],
@@ -222,3 +165,4 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+

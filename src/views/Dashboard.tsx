@@ -11,34 +11,40 @@ import {
   Plus,
   ArrowRightLeft
 } from 'lucide-react';
-import { useAppStore } from '../store';
+import { useAppStore, PaymentMethod } from '../store';
 import { getAccountBalance } from '../lib/balance';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 
-export function Dashboard() {
+export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const store = useAppStore();
   
-  const totalFiat = store.accounts
-    .filter(a => a.currency === store.baseFiat && a.ownerType !== 'Cliente')
-    .reduce((acc, a) => acc + getAccountBalance(a.id, store), 0);
+  const totalFiat = store.paymentMethods
+    .filter((pm: PaymentMethod) => pm.currency === store.baseFiat && pm.ownerType !== 'Cliente')
+    .reduce((acc, pm: PaymentMethod) => acc + getAccountBalance(pm.id, store), 0);
     
-  const totalCrypto = store.accounts
-    .filter(a => a.currency === store.baseCrypto && a.ownerType !== 'Cliente')
-    .reduce((acc, a) => acc + getAccountBalance(a.id, store), 0);
+  const totalCrypto = store.paymentMethods
+    .filter((pm: PaymentMethod) => pm.currency === store.baseCrypto && pm.ownerType !== 'Cliente')
+    .reduce((acc, pm: PaymentMethod) => acc + getAccountBalance(pm.id, store), 0);
 
   const recentOperations = [...store.operations]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
-  const activePlatforms = store.platforms
-    .map(p => ({
-      ...p,
-      linkedAccounts: store.accounts.filter(a => a.platformId === p.id || a.paymentMethods?.some(pm => pm.type === p.id))
-    }))
-    .filter(p => p.linkedAccounts.length > 0)
-    .sort((a, b) => b.linkedAccounts.length - a.linkedAccounts.length)
-    .slice(0, 4);
+  // Derive unique active platforms from payment methods
+  const activePlatformNames = Array.from(new Set(store.paymentMethods.map((pm: PaymentMethod) => pm.platformChannel)));
+  const activePlatformsMetrics = activePlatformNames.map(name => {
+    const linkedPMs = store.paymentMethods.filter((pm: PaymentMethod) => pm.platformChannel === name);
+    return {
+      name,
+      // naive mapping to color fiat/crypto
+      type: linkedPMs.some(pm => store.currencies.find(c => c.symbol === pm.currency)?.type === 'Fiat') ? 'Fiat' : 'Crypto',
+      linkedAccounts: linkedPMs
+    };
+  })
+  .filter(p => p.linkedAccounts.length > 0)
+  .sort((a, b) => b.linkedAccounts.length - a.linkedAccounts.length)
+  .slice(0, 4);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-4 pb-20 sm:pb-4 animate-in fade-in duration-500">
@@ -99,7 +105,7 @@ export function Dashboard() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{op.counterpartName || 'Operación P2P'}</span>
+                        <span className="font-bold text-white text-sm">{op.clientName || 'Operación P2P'}</span>
                         <span className={cn(
                           "text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter",
                           op.type === 'Compra' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
@@ -140,8 +146,8 @@ export function Dashboard() {
           </div>
           <div className="bg-slate-900/50 border border-slate-800 rounded-3xl p-6 space-y-6">
             <div className="space-y-4">
-              {activePlatforms.map(p => (
-                <div key={p.id} className="flex items-center justify-between group cursor-pointer">
+              {activePlatformsMetrics.map(p => (
+                <div key={p.name} className="flex items-center justify-between group cursor-pointer">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-2 h-2 rounded-full",
@@ -151,19 +157,21 @@ export function Dashboard() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                      {p.linkedAccounts.length} ctas
+                      {p.linkedAccounts.length} medios
                     </span>
                     <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-slate-400 transition-colors" />
                   </div>
                 </div>
               ))}
-              {activePlatforms.length === 0 && (
+              {activePlatformsMetrics.length === 0 && (
                 <p className="text-[10px] text-slate-600 italic text-center py-4">No hay canales con cuentas vinculadas.</p>
               )}
             </div>
             
             <div className="pt-6 border-t border-slate-800">
-              <button className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-xs font-bold transition-all uppercase tracking-widest flex items-center justify-center gap-2">
+              <button 
+                onClick={() => onNavigate?.('balance')}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-xs font-bold transition-all uppercase tracking-widest flex items-center justify-center gap-2">
                 <Plus className="w-3 h-3" /> Configurar Métodos
               </button>
             </div>

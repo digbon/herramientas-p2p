@@ -1,30 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
-import { Search } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export function OwnerNamePicker({
+export function OwnerNameInputPicker({
   value,
-  onSelect,
+  onChange,
   ownerType,
-  disabled,
-  placeholder
+  disabled
 }: {
   value: string;
-  onSelect: (name: string, isNew?: boolean) => void;
+  onChange: (name: string) => void;
   ownerType: 'Mias' | 'Cliente';
   disabled?: boolean;
-  placeholder?: string;
 }) {
   const store = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Derive unique names from paymentMethods and operations
+  // Derive unique names from paymentMethods
   const existingNames = Array.from(new Set([
-    ...store.paymentMethods.filter(p => p.ownerType === ownerType).map(p => p.ownerName),
-    ...(ownerType === 'Cliente' ? store.operations.map(op => op.clientName) : store.operations.map(op => op.p2pPlatform))
+    ...store.paymentMethods.filter(pm => pm.ownerType === ownerType).map(p => p.ownerName)
   ])).filter(Boolean);
 
   const filteredNames = existingNames.filter(n => n.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -52,17 +48,16 @@ export function OwnerNamePicker({
           onChange={e => {
             setSearchTerm(e.target.value);
             setIsOpen(true);
-            onSelect(e.target.value, !existingNames.includes(e.target.value));
+            onChange(e.target.value);
           }}
           onFocus={() => setIsOpen(true)}
           disabled={disabled}
-          placeholder={placeholder || (ownerType === 'Cliente' ? "Nombre completo del cliente" : "Nombre")}
+          placeholder="Nombre completo"
           className={cn(
-            "w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-3 py-3 text-white outline-none focus:border-blue-500 font-bold",
+            "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-white outline-none focus:border-blue-500 font-bold",
             disabled && "opacity-50 cursor-not-allowed"
           )}
         />
-        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
       </div>
 
       {isOpen && !disabled && (
@@ -75,7 +70,7 @@ export function OwnerNamePicker({
                   className="px-4 py-2 hover:bg-slate-800 cursor-pointer text-sm font-medium text-slate-200"
                   onClick={() => {
                     setSearchTerm(name);
-                    onSelect(name, false);
+                    onChange(name);
                     setIsOpen(false);
                   }}
                 >
@@ -86,11 +81,11 @@ export function OwnerNamePicker({
                  <div
                    className="px-4 py-2 hover:bg-blue-600/20 cursor-pointer text-sm font-medium text-blue-400 border-t border-slate-800"
                    onClick={() => {
-                     onSelect(searchTerm, true);
+                     onChange(searchTerm);
                      setIsOpen(false);
                    }}
                  >
-                   + Agregar "{searchTerm}"
+                   + Usar "{searchTerm}"
                  </div>
               )}
             </>
@@ -99,12 +94,12 @@ export function OwnerNamePicker({
               className={cn("px-4 py-3 text-xs", searchTerm ? "hover:bg-blue-600/20 cursor-pointer font-bold text-blue-400" : "text-slate-400")}
               onClick={() => {
                 if (searchTerm) {
-                  onSelect(searchTerm, true);
+                  onChange(searchTerm);
                   setIsOpen(false);
                 }
               }}
             >
-              {searchTerm ? `+ Agregar nuevo ${ownerType === 'Cliente' ? 'cliente' : 'propietario'}: "${searchTerm}"` : 'Escribe para buscar...'}
+              {searchTerm ? `+ Usar nuevo nombre: "${searchTerm}"` : 'Escribe para buscar...'}
             </div>
           )}
         </div>

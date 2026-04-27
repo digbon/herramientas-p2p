@@ -1,18 +1,19 @@
-import { AppState } from '../store';
+import { AppState, PaymentMethod } from '../store';
 
-export const getAccountBalance = (accountId: string, state: { 
-  accounts: any[], 
+export const getAccountBalance = (paymentMethodId: string, state: { 
+  paymentMethods: PaymentMethod[], 
   movements: any[], 
-  operations: any[] 
+  operations: any[],
+  transfers?: any[]
 }) => {
-  const account = state.accounts.find(a => a.id === accountId);
-  if (!account) return 0;
+  const pm = state.paymentMethods.find(p => p.id === paymentMethodId);
+  if (!pm) return 0;
   
-  let balance = account.initialBalance || 0;
+  let balance = pm.initialBalance || 0;
   
   // Apply movements (Deposits/Withdrawals)
   state.movements.forEach(m => {
-    if (m.accountId === accountId) {
+    if (m.paymentMethodId === paymentMethodId || m.accountId === paymentMethodId) {
        if (m.type === 'Deposit') balance += m.amount;
        if (m.type === 'Withdrawal') balance -= m.amount;
     }
@@ -20,26 +21,22 @@ export const getAccountBalance = (accountId: string, state: {
 
   // Apply operations
   state.operations.forEach(op => {
-     // Check My Account Source
-     if (op.sourceMyAccountId === accountId) balance -= op.amountSent;
-     // Check Client Account Source (They receive what I sent)
-     if (op.sourceClientAccountId === accountId) balance += op.amountSent;
-     // Check My Account Destination
-     if (op.destMyAccountId === accountId) balance += op.amountReceived;
-     // Check Client Account Destination (They send what I receive)
-     if (op.destClientAccountId === accountId) balance -= op.amountReceived;
+     // Check Source
+     if (op.sourceMyPaymentMethodId === paymentMethodId) balance -= op.amountInvested;
+     if (op.sourceClientPaymentMethodId === paymentMethodId) balance += op.amountInvested;
+     // Check Destination
+     if (op.destMyPaymentMethodId === paymentMethodId) balance += op.amountReceived;
+     if (op.destClientPaymentMethodId === paymentMethodId) balance -= op.amountReceived;
      
      // Legacy support
-     if (op.sourceAccountId === accountId) balance -= op.amountSent;
-     if (op.destAccountId === accountId) balance += op.amountReceived;
-     if (op.clientSourceAccountId === accountId) balance += op.amountSent;
-     if (op.clientDestAccountId === accountId) balance -= op.amountReceived;
+     if (op.sourcePaymentMethodId === paymentMethodId) balance -= (op.amountSent || op.amountInvested);
+     if (op.destPaymentMethodId === paymentMethodId) balance += (op.amountReceived);
   });
 
   // Apply transfers
-  if ('transfers' in state) {
-    (state.transfers as any[]).forEach(t => {
-      if (t.sourceAccountId === accountId) {
+  if (state.transfers) {
+    state.transfers.forEach(t => {
+      if (t.sourcePaymentMethodId === paymentMethodId || t.sourceAccountId === paymentMethodId) {
         // Source loses amount + commissions
         let totalMinus = t.amount;
         (t.commissions || []).forEach((c: any) => {
@@ -51,7 +48,7 @@ export const getAccountBalance = (accountId: string, state: {
         });
         balance -= totalMinus;
       }
-      if (t.destAccountId === accountId) {
+      if (t.destPaymentMethodId === paymentMethodId || t.destAccountId === paymentMethodId) {
         // Destination gains amount
         balance += t.amount;
       }
@@ -60,3 +57,4 @@ export const getAccountBalance = (accountId: string, state: {
 
   return balance;
 };
+
