@@ -223,20 +223,54 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                   <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Precio de intercambio" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-white outline-none focus:border-blue-500 font-medium" />
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-xs text-slate-400">Comisiones de {type.toLowerCase()}</label>
                   {commissions.map((comm, index) => (
-                    <div key={index} className="flex gap-2 items-center bg-slate-950 p-2 rounded-lg border border-slate-800">
-                      <input type="text" placeholder="Nombre" value={comm.name} onChange={(e) => updateCommission(index, { name: e.target.value })} className="flex-1 bg-transparent text-sm text-white outline-none" />
-                      <div className="w-px h-6 bg-slate-800 mx-1"></div>
-                      <input type="number" placeholder="Valor" value={comm.value || ''} onChange={(e) => updateCommission(index, { value: parseFloat(e.target.value) })} className="w-20 bg-transparent text-sm text-white outline-none text-right" />
-                      <button onClick={() => updateCommission(index, { type: comm.type === 'fixed' ? 'percentage' : 'fixed' })} className={cn("px-4 py-1 text-xs font-bold rounded", comm.type === 'percentage' ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400", "min-w-[40px] text-center")} title="Activar por porcentaje">
-                        {comm.type === 'percentage' ? '%' : 'FIJO'}
-                      </button>
-                      <button onClick={() => removeCommission(index)} className="p-1 text-slate-500 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    <div key={index} className="space-y-2 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Nombre (ej: Binance Fee)" 
+                          value={comm.name} 
+                          onChange={(e) => updateCommission(index, { name: e.target.value })} 
+                          className="flex-1 bg-transparent text-sm text-white outline-none font-medium" 
+                        />
+                        <button onClick={() => removeCommission(index)} className="p-1.5 text-slate-600 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                          <input 
+                            type="number" 
+                            placeholder="0.00" 
+                            value={comm.value || ''} 
+                            onChange={(e) => updateCommission(index, { value: parseFloat(e.target.value) })} 
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500 font-mono" 
+                          />
+                          {comm.type === 'percentage' && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 font-black text-xs">%</span>
+                          )}
+                        </div>
+
+                        <button 
+                          onClick={() => updateCommission(index, { type: comm.type === 'fixed' ? 'percentage' : 'fixed' })} 
+                          className={cn(
+                            "px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all border shrink-0",
+                            comm.type === 'percentage' 
+                              ? "bg-blue-500/10 border-blue-500/50 text-blue-400" 
+                              : "bg-slate-800 border-slate-700 text-slate-500"
+                          )}
+                        >
+                          {comm.type === 'percentage' ? 'Desactivar porcentaje' : 'Activar por porcentaje'}
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  <button onClick={addCommission} className="text-xs text-blue-400 font-bold flex items-center gap-1 hover:text-blue-300"><Plus className="w-3 h-3"/> Añadir Comisión</button>
+                  <button onClick={addCommission} className="w-full py-3 border-2 border-dashed border-slate-800 rounded-xl text-xs text-blue-400 font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-500/5 hover:border-blue-500/30 transition-all">
+                    <Plus className="w-4 h-4"/> Añadir Comisión
+                  </button>
                 </div>
               </div>
             </div>

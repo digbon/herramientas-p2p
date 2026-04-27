@@ -1,12 +1,118 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle, BookOpen, ArrowRight, Archive } from 'lucide-react';
+import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle, BookOpen, ArrowRight, Archive, Cloud, LogIn, LogOut, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { driveService, GoogleDriveFile } from '../lib/googleDrive';
 
 export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const store = useAppStore();
+  const [isDriveAuth, setIsDriveAuth] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
+  const [isLoadingDrive, setIsLoadingDrive] = useState(false);
+
+  useEffect(() => {
+    driveService.init();
+    
+    const handleAuth = () => {
+      setIsDriveAuth(true);
+      loadDriveFiles();
+    };
+    
+    window.addEventListener('googledrive_auth_success', handleAuth);
+    return () => window.removeEventListener('googledrive_auth_success', handleAuth);
+  }, []);
+
+  const loadDriveFiles = async () => {
+    if (!driveService.isAuthenticated()) return;
+    setIsLoadingDrive(true);
+    try {
+      const files = await driveService.listBackups();
+      setDriveFiles(files);
+    } catch (error) {
+      console.error('Error loading drive files:', error);
+    } finally {
+      setIsLoadingDrive(false);
+    }
+  };
+
+  const handleCloudBackup = async () => {
+    if (!driveService.isAuthenticated()) {
+      driveService.login();
+      return;
+    }
+
+    setIsLoadingDrive(true);
+    try {
+      const state = useAppStore.getState();
+      const zip = new JSZip();
+      
+      const stateToSave = JSON.stringify(state, (key, value) => 
+        typeof value === 'function' ? undefined : value
+      , 2);
+      
+      zip.file('app_data.json', stateToSave);
+      const attachmentsFolder = zip.folder('archivos_adjuntos');
+      
+      const processAttachments = (prefix: string, items: any[]) => {
+        items.forEach(item => {
+          if (item.attachments && item.attachments.length > 0) {
+            item.attachments.forEach((att: any, idx: number) => {
+              if (att.dataUrl && att.dataUrl.includes('base64,')) {
+                const base64Data = att.dataUrl.split('base64,')[1];
+                const extension = att.type ? att.type.split('/')[1] || 'bin' : 'bin';
+                const filename = `${prefix}_${item.id}_${idx + 1}.${extension}`;
+                attachmentsFolder?.file(filename, base64Data, { base64: true });
+              }
+            });
+          }
+        });
+      };
+
+      processAttachments('op', state.operations || []);
+      processAttachments('mov', state.movements || []);
+      processAttachments('tr', state.transfers || []);
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const filename = `p2p-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+      
+      await driveService.uploadBackup(blob, filename);
+      alert('¡Copia de seguridad subida a Google Drive con éxito!');
+      loadDriveFiles();
+    } catch (error) {
+      console.error('Error in cloud backup:', error);
+      alert('Error al subir la copia a la nube.');
+    } finally {
+      setIsLoadingDrive(false);
+    }
+  };
+
+  const handleCloudRestore = async (fileId: string) => {
+    if (!confirm('Importar esta copia desde la nube reemplazará toda tu información actual. ¿Continuar?')) return;
+
+    setIsLoadingDrive(true);
+    try {
+      const blob = await driveService.downloadBackup(fileId);
+      const zip = await JSZip.loadAsync(blob);
+      const jsonFile = zip.file('app_data.json');
+      
+      if (!jsonFile) throw new Error('No se encontró el archivo de datos.');
+      
+      const jsonString = await jsonFile.async('string');
+      const importedData = JSON.parse(jsonString);
+
+      if (importedData) {
+        store.importData(importedData);
+        alert('¡Copia de seguridad restaurada con éxito!');
+      }
+    } catch (error) {
+      console.error('Error in cloud restore:', error);
+      alert('Error al restaurar desde la nube.');
+    } finally {
+      setIsLoadingDrive(false);
+    }
+  };
 
   const handleExportZip = async () => {
     try {
@@ -102,6 +208,7 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       </SectionCard>
 
       <SectionCard title="Copias de Seguridad (ZIP)" icon={<Archive className="w-4 h-4" />}>
+        {/* local as before */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <button 
             onClick={handleExportZip}
@@ -125,6 +232,88 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
         <p className="text-[11px] text-slate-500 leading-relaxed text-center px-2">
           El archivo .zip incluye toda la base de datos de tu historial y los comprobantes adjuntos de las operaciones. Utilízalo para respaldos o para continuar trabajando en otro dispositivo.
         </p>
+      </SectionCard>
+
+      <SectionCard title="Respaldos en la Nube" icon={<Cloud className="w-4 h-4 text-blue-400" />}>
+        {!isDriveAuth ? (
+          <div className="text-center py-6 space-y-4">
+            <div className="w-16 h-16 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/20 shadow-lg shadow-blue-500/5">
+              <Cloud className="w-8 h-8 text-blue-500" />
+            </div>
+            <p className="text-sm text-slate-400 max-w-[200px] mx-auto">Conecta tu cuenta de Google para respaldar tus datos en Drive.</p>
+            <button 
+              onClick={() => driveService.login()}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mx-auto transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+            >
+              <LogIn className="w-4 h-4" /> Conectar con Google
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Estado</div>
+                  <div className="text-xs font-bold text-white">Conectado a Drive</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  driveService.logout();
+                  setIsDriveAuth(false);
+                }}
+                className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button 
+              onClick={handleCloudBackup}
+              disabled={isLoadingDrive}
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+            >
+              {isLoadingDrive ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+              {isLoadingDrive ? 'Procesando...' : 'Subir Respaldo Actual'}
+            </button>
+
+            <div className="pt-2 border-t border-slate-800/50">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Respaldos en la Nube</h3>
+                <button onClick={loadDriveFiles} className="text-blue-400 hover:text-blue-300 transition-colors">
+                  <RefreshCw className={cn("w-3.5 h-3.5", isLoadingDrive && "animate-spin")} />
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                {driveFiles.length === 0 ? (
+                  <div className="bg-slate-950 border border-slate-800/50 rounded-xl p-6 text-center">
+                    <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest italic">No se encontraron respaldos</p>
+                  </div>
+                ) : (
+                  driveFiles.map(file => (
+                    <div key={file.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between group hover:border-slate-700 transition-colors">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-slate-200 truncate pr-2">{file.name}</span>
+                        <span className="text-[9px] font-medium text-slate-500">{new Date(file.modifiedTime).toLocaleString()}</span>
+                      </div>
+                      <button 
+                        onClick={() => handleCloudRestore(file.id)}
+                        disabled={isLoadingDrive}
+                        className="bg-slate-800 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shrink-0"
+                      >
+                        Restaurar
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Idioma">
