@@ -28,7 +28,10 @@ export function ClientDetail({ clientId, onClose }: ClientDetailProps) {
   const clientAccounts = store.accounts.filter(a => a.ownerType === 'Cliente' && a.ownerName === client.name);
   const clientPlatforms = store.platforms.filter(p => 
     p.owner === 'Cliente' && 
-    store.accounts.some(a => a.platformId === p.id && a.ownerName === client.name)
+    store.accounts.some(a => 
+      a.ownerName === client.name && 
+      (a.platformId === p.id || a.paymentMethods?.some(pm => pm.type === p.id))
+    )
   );
   
   // Get operations where this client is the counterpart

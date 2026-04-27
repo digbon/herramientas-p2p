@@ -11,6 +11,7 @@ import { History } from './views/History';
 import { Balance } from './views/Balance';
 import { Statistics } from './views/Statistics';
 import { Gestor } from './views/Gestor';
+import { Documentation } from './views/Documentation';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('simulador');
@@ -22,7 +23,8 @@ export default function App() {
       {activeTab === 'balance' && <Balance />}
       {activeTab === 'estadisticas' && <Statistics />}
       {activeTab === 'simulador' && <Simulator />}
-      {activeTab === 'ajustes' && <Gestor />}
+      {activeTab === 'ajustes' && <Gestor onNavigate={setActiveTab} />}
+      {activeTab === 'documentacion' && <Documentation onBack={() => setActiveTab('ajustes')} />}
     </Layout>
   );
 }

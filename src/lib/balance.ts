@@ -22,18 +22,18 @@ export const getAccountBalance = (accountId: string, state: {
   state.operations.forEach(op => {
      // Check My Account Source
      if (op.sourceMyAccountId === accountId) balance -= op.amountSent;
-     // Check Client Account Source
-     if (op.sourceClientAccountId === accountId) balance -= op.amountSent;
+     // Check Client Account Source (They receive what I sent)
+     if (op.sourceClientAccountId === accountId) balance += op.amountSent;
      // Check My Account Destination
      if (op.destMyAccountId === accountId) balance += op.amountReceived;
-     // Check Client Account Destination
-     if (op.destClientAccountId === accountId) balance += op.amountReceived;
+     // Check Client Account Destination (They send what I receive)
+     if (op.destClientAccountId === accountId) balance -= op.amountReceived;
      
      // Legacy support
      if (op.sourceAccountId === accountId) balance -= op.amountSent;
      if (op.destAccountId === accountId) balance += op.amountReceived;
-     if (op.clientSourceAccountId === accountId) balance -= op.amountSent;
-     if (op.clientDestAccountId === accountId) balance += op.amountReceived;
+     if (op.clientSourceAccountId === accountId) balance += op.amountSent;
+     if (op.clientDestAccountId === accountId) balance -= op.amountReceived;
   });
 
   // Apply transfers
@@ -42,7 +42,7 @@ export const getAccountBalance = (accountId: string, state: {
       if (t.sourceAccountId === accountId) {
         // Source loses amount + commissions
         let totalMinus = t.amount;
-        t.commissions.forEach((c: any) => {
+        (t.commissions || []).forEach((c: any) => {
           if (c.type === 'percentage') {
             totalMinus += (t.amount * c.value) / 100;
           } else {

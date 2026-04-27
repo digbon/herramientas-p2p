@@ -1,25 +1,129 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
-import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle } from 'lucide-react';
+import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle, BookOpen, ArrowRight, Archive } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { connectSyncFolder } from '../lib/sync';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
-export function Gestor() {
+export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const store = useAppStore();
 
+  const handleExportZip = async () => {
+    try {
+      const state = useAppStore.getState();
+      const zip = new JSZip();
+      
+      // Parse state and remove functions
+      const stateToSave = JSON.stringify(state, (key, value) => 
+        typeof value === 'function' ? undefined : value
+      , 2);
+      
+      zip.file('app_data.json', stateToSave);
+
+      // We can also extract attachments into a separate folder for easy viewing by the user
+      // if they extract the zip on their computer.
+      const attachmentsFolder = zip.folder('archivos_adjuntos');
+      
+      const processAttachments = (prefix: string, items: any[]) => {
+        items.forEach(item => {
+          if (item.attachments && item.attachments.length > 0) {
+            item.attachments.forEach((att: any, idx: number) => {
+              if (att.dataUrl && att.dataUrl.includes('base64,')) {
+                // e.g. data:image/png;base64,iVBORw0KGgo...
+                const base64Data = att.dataUrl.split('base64,')[1];
+                const extension = att.type ? att.type.split('/')[1] || 'bin' : 'bin';
+                const filename = `${prefix}_${item.id}_${idx + 1}.${extension}`;
+                attachmentsFolder?.file(filename, base64Data, { base64: true });
+              }
+            });
+          }
+        });
+      };
+
+      processAttachments('op', state.operations || []);
+      processAttachments('mov', state.movements || []);
+      processAttachments('tr', state.transfers || []);
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, `p2p-backup-${new Date().toISOString().slice(0, 10)}.zip`);
+    } catch (error) {
+      console.error('Error exportando ZIP:', error);
+      alert('Hubo un error al crear la copia de seguridad.');
+    }
+  };
+
+  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      if (confirm('Importar una copia de seguridad reemplazará toda tu información actual. ¿Estás seguro?')) {
+        const zip = await JSZip.loadAsync(file);
+        
+        // Find the JSON file
+        const jsonFile = zip.file('app_data.json');
+        if (!jsonFile) {
+          throw new Error('No se encontró el archivo de datos (app_data.json) en el ZIP.');
+        }
+
+        const jsonString = await jsonFile.async('string');
+        const importedData = JSON.parse(jsonString);
+
+        if (importedData) {
+          store.importData(importedData);
+          alert('¡Copia de seguridad restaurada con éxito!');
+        }
+      }
+    } catch (error) {
+      console.error('Error importando ZIP:', error);
+      alert('Error al leer el archivo ZIP de copia de seguridad.');
+    } finally {
+      e.target.value = ''; // Reset input
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <h1 className="text-xl font-bold text-white tracking-tight">Ajustes Generales</h1>
       </div>
 
-      <SectionCard title="Carpeta Sincronizada" icon={<FolderUp className="w-4 h-4" />}>
-        <button onClick={() => connectSyncFolder()} className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all shadow-lg active:scale-[0.98] mb-4">
-          <FolderUp className="w-5 h-5" />
-          Conectar Carpeta
+      <SectionCard title="Manual de Ayuda" icon={<BookOpen className="w-4 h-4" />}>
+        <button 
+          onClick={() => onNavigate && onNavigate('documentacion')} 
+          className="w-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-between px-5 py-4 rounded-xl font-bold transition-all border border-slate-700 shadow-inner group"
+        >
+          <div className="flex items-center gap-3">
+             <BookOpen className="w-5 h-5 text-blue-400" />
+             <span>Sobre el funcionamiento</span>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors" />
         </button>
-        <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-          Toda la información de la app (configuración, historial de operaciones y movimientos) se guarda automáticamente en tu navegador. Para sincronizarla desde la nube, utiliza las opciones de copia de seguridad.
+      </SectionCard>
+
+      <SectionCard title="Copias de Seguridad (ZIP)" icon={<Archive className="w-4 h-4" />}>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <button 
+            onClick={handleExportZip}
+            className="bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-600/20 flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all group active:scale-95"
+          >
+            <Download className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-tighter">Exportar Backup</span>
+          </button>
+          
+          <label className="bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all group active:scale-95 cursor-pointer">
+            <Upload className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-tighter text-center">Importar Backup</span>
+            <input 
+              type="file" 
+              accept=".zip" 
+              className="hidden" 
+              onChange={handleImportZip}
+            />
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500 leading-relaxed text-center px-2">
+          El archivo .zip incluye toda la base de datos de tu historial y los comprobantes adjuntos de las operaciones. Utilízalo para respaldos o para continuar trabajando en otro dispositivo.
         </p>
       </SectionCard>
 
@@ -32,98 +136,6 @@ export function Gestor() {
           <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </SectionCard>
-
-      <div id="gestor-de-datos">
-      <SectionCard title="Gestor de Datos" icon={<RotateCcw className="w-4 h-4" />}>
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <button 
-            onClick={() => {
-              const state = useAppStore.getState();
-              const dataStr = JSON.stringify(state, null, 2);
-              const dataBlob = new Blob([dataStr], { type: 'application/json' });
-              const url = URL.createObjectURL(dataBlob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `p2p-backup-${new Date().toISOString().slice(0,10)}.json`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }}
-            className="bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-600/20 flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all group active:scale-95"
-          >
-            <Download className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Respaldar (JSON)</span>
-          </button>
-          
-          <button 
-             onClick={() => {
-               const state = store;
-               // Basic CSV export for operations
-               let csv = 'ID,Fecha,Tipo,Orden,Moneda_Origen,Cuenta_Origen,Moneda_Destino,Cuenta_Destino,Contraparte,Monto_Enviado,Monto_Recibido,Precio,Comision\n';
-               state.operations.forEach(op => {
-                 const calculateTotal = (val: number, comms: any[]) => {
-                   return (comms || []).reduce((acc, curr) => {
-                     const v = typeof curr === 'object' ? curr.value : curr;
-                     const type = typeof curr === 'object' ? curr.type : 'fixed';
-                     if (type === 'percentage') {
-                       return acc + (val * (v / 100));
-                     }
-                     return acc + v;
-                   }, 0);
-                 };
-
-                 const cs = calculateTotal(op.amountSent, op.commissionsSent);
-                 const netSent = op.amountSent - cs;
-                 const prelimReceived = netSent * op.price;
-                 const cr = calculateTotal(prelimReceived, op.commissionsReceived);
-                 
-                 csv += `${op.id},${op.date},${op.type},${op.order},${op.sourceCurrency},${store.accounts.find(a => a.id === op.sourceAccountId)?.name || ''},${op.destCurrency},${store.accounts.find(a => a.id === op.destAccountId)?.name || ''},${op.counterpartName},${op.amountSent},${op.amountReceived},${op.price},${cs + cr}\n`;
-               });
-               const dataBlob = new Blob([csv], { type: 'text/csv' });
-               const url = URL.createObjectURL(dataBlob);
-               const link = document.createElement('a');
-               link.href = url;
-               link.download = `p2p-operations-${new Date().toISOString().slice(0,10)}.csv`;
-               document.body.appendChild(link);
-               link.click();
-               document.body.removeChild(link);
-             }}
-             className="bg-blue-600/10 border border-blue-500/20 text-blue-400 hover:bg-blue-600/20 flex flex-col items-center justify-center p-4 rounded-2xl gap-2 transition-all group active:scale-95"
-          >
-            <FolderUp className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
-            <span className="text-[10px] font-black uppercase tracking-tighter">Exportar (CSV)</span>
-          </button>
-        </div>
-        
-        <label className="w-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center gap-3 py-4 rounded-2xl font-bold transition-all cursor-pointer border border-slate-700 shadow-inner group">
-          <Upload className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
-          <span className="text-sm">Importar Base de Datos</span>
-          <input 
-            type="file" 
-            accept=".json" 
-            className="hidden" 
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                try {
-                  const importedData = JSON.parse(event.target?.result as string);
-                  if (confirm('Importar estos datos reemplazará tu información actual. ¿Estás seguro?')) {
-                     store.importData(importedData);
-                     alert('¡Datos importados con éxito!');
-                  }
-                } catch (err) {
-                  alert('Error al leer el archivo JSON.');
-                }
-              };
-              reader.readAsText(file);
-              e.target.value = '';
-            }}
-          />
-        </label>
-      </SectionCard>
-      </div>
 
       <SectionCard title="Mantenimiento" icon={<RotateCcw className="w-4 h-4 text-red-500" />}>
         <button 
@@ -161,3 +173,4 @@ function SectionCard({ title, icon, children }: { title: string; icon?: React.Re
     </div>
   );
 }
+

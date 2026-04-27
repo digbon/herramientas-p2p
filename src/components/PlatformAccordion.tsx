@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Platform } from '../store';
+import { Platform, useAppStore } from '../store';
 
 interface PlatformAccordionProps {
   platform: Platform;
@@ -10,8 +10,15 @@ interface PlatformAccordionProps {
 }
 
 export function PlatformAccordion({ platform, className }: PlatformAccordionProps) {
+  const store = useAppStore();
   const [isExpanded, setIsExpanded] = useState(false);
-  const accountsCount = (platform.accounts?.length || 0) + (platform.details ? 1 : 0);
+  
+  // Find full accounts connected to this platform
+  const linkedAccounts = store.accounts.filter(a => 
+    a.platformId === platform.id || a.paymentMethods?.some(pm => pm.type === platform.id)
+  );
+
+  const accountsCount = (platform.accounts?.length || 0) + (platform.details ? 1 : 0) + linkedAccounts.length;
 
   return (
     <div className={cn("bg-slate-950 border border-slate-800 rounded-xl overflow-hidden transition-all", className)}>
@@ -39,7 +46,7 @@ export function PlatformAccordion({ platform, className }: PlatformAccordionProp
         <div className="px-4 pb-4 pt-1 space-y-2 border-t border-slate-900/50 bg-slate-900/10">
           {platform.details && (
             <div className="bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/30">
-              <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-0.5">Principal</div>
+              <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest mb-0.5">Principal (Antigua)</div>
               <div className="text-white font-mono text-sm tracking-tight">{platform.details}</div>
             </div>
           )}
@@ -49,6 +56,23 @@ export function PlatformAccordion({ platform, className }: PlatformAccordionProp
               <div className="text-white font-mono text-sm tracking-tight">{acc.value}</div>
             </div>
           ))}
+          {linkedAccounts.map(acc => {
+            // Check if it's the main platform or a payment method
+            const isMain = acc.platformId === platform.id;
+            const pmData = acc.paymentMethods?.find(pm => pm.type === platform.id);
+            const value = isMain ? acc.platformValue : pmData?.value;
+            const label = isMain ? acc.name : pmData?.label;
+            
+            return (
+              <div key={`linked-${acc.id}-${platform.id}`} className="bg-slate-900/30 p-2.5 rounded-lg border border-slate-800/30">
+                <div className="flex items-center justify-between mb-0.5">
+                   <div className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{label || 'Cuenta'}</div>
+                   <div className="text-[9px] font-bold text-slate-500 uppercase">{acc.ownerName}</div>
+                </div>
+                {value && <div className="text-white font-mono text-sm tracking-tight">{value}</div>}
+              </div>
+            );
+          })}
           {accountsCount === 0 && (
             <div className="text-center py-2 text-[10px] text-slate-700 font-bold uppercase tracking-widest italic">
               Sin cuentas detalladas

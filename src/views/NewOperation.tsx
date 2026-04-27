@@ -420,6 +420,15 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         onlyOwner="Mias"
                         value={sourceMyAccountId}
                         onSelect={(val) => setSourceMyAccountId(val)}
+                        onEdit={(id) => {
+                          setShowAddAccountModal({
+                            currency: sourceCurrency,
+                            platformId: sourceMyPlatformId,
+                            target: "sourceMy",
+                            owner: "Mias",
+                            editAccountId: id,
+                          });
+                        }}
                         onAddNew={() => {
                           setShowAddAccountModal({
                             currency: sourceCurrency,
@@ -499,6 +508,15 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         disabled={!clientName || !sourceClientPlatformId}
                         value={sourceClientAccountId}
                         onSelect={(val) => setSourceClientAccountId(val)}
+                        onEdit={(id) => {
+                          setShowAddAccountModal({
+                            currency: sourceCurrency,
+                            platformId: sourceClientPlatformId,
+                            target: "sourceClient",
+                            owner: "Cliente",
+                            editAccountId: id,
+                          });
+                        }}
                         onAddNew={() => {
                           setShowAddAccountModal({
                             currency: sourceCurrency,
@@ -597,6 +615,15 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         onlyOwner="Mias"
                         value={destMyAccountId}
                         onSelect={(val) => setDestMyAccountId(val)}
+                        onEdit={(id) => {
+                          setShowAddAccountModal({
+                            currency: destCurrency,
+                            platformId: destMyPlatformId,
+                            target: "destMy",
+                            owner: "Mias",
+                            editAccountId: id,
+                          });
+                        }}
                         onAddNew={() => {
                           setShowAddAccountModal({
                             currency: destCurrency,
@@ -676,6 +703,15 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                         disabled={!clientName || !destClientPlatformId}
                         value={destClientAccountId}
                         onSelect={(val) => setDestClientAccountId(val)}
+                        onEdit={(id) => {
+                          setShowAddAccountModal({
+                            currency: destCurrency,
+                            platformId: destClientPlatformId,
+                            target: "destClient",
+                            owner: "Cliente",
+                            editAccountId: id,
+                          });
+                        }}
                         onAddNew={() => {
                           setShowAddAccountModal({
                             currency: destCurrency,
@@ -1152,18 +1188,20 @@ function MiniAddAccountModal({
               />
             </div>
 
-            <div className="space-y-1 text-[10px]">
-              <label className="text-slate-500 font-bold uppercase">
-                Saldo Inicial ({currency})
-              </label>
-              <input
-                value={initialBalance}
-                onChange={(e) => setInitialBalance(e.target.value)}
-                type="number"
-                placeholder="0.00"
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-bold"
-              />
-            </div>
+            {owner === 'Mias' && (
+              <div className="space-y-1 text-[10px]">
+                <label className="text-slate-500 font-bold uppercase">
+                  Saldo Inicial ({currency})
+                </label>
+                <input
+                  value={initialBalance}
+                  onChange={(e) => setInitialBalance(e.target.value)}
+                  type="number"
+                  placeholder="0.00"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-bold"
+                />
+              </div>
+            )}
 
             <div className="pt-2 border-t border-slate-800">
               <div className="flex items-center justify-between mb-3">
@@ -1198,7 +1236,8 @@ function MiniAddAccountModal({
                         Plataforma
                       </label>
                       <PlatformPicker
-                        value={pm.value}
+                        value={pm.type}
+                        onlyPlatforms={true}
                         ownerFilter={owner}
                         onSelect={(pId, accVal, pName) => {
                           setPaymentMethods(
@@ -1208,13 +1247,32 @@ function MiniAddAccountModal({
                                     ...p,
                                     type: pId,
                                     label: pName,
-                                    value: accVal || p.value,
                                   }
                                 : p,
                             ),
                           );
                         }}
                         className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase">
+                        ID / Número
+                      </label>
+                      <input
+                        value={pm.value}
+                        onChange={(e) => {
+                          setPaymentMethods(
+                            paymentMethods.map((p) =>
+                              p.id === pm.id
+                                ? { ...p, value: e.target.value }
+                                : p,
+                            ),
+                          );
+                        }}
+                        type="text"
+                        placeholder="ID, CBU, número, etc."
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white outline-none focus:border-blue-500 font-mono"
                       />
                     </div>
                   </div>

@@ -190,7 +190,7 @@ export function History() {
                 const destAcc = store.accounts.find(a => a.id === t.destAccountId);
                 const currency = sourceAcc?.currency || '';
                 
-                const totalComs = t.commissions.reduce((acc, c) => {
+                const totalComs = (t.commissions || []).reduce((acc, c) => {
                   if (c.type === 'percentage') return acc + (t.amount * c.value) / 100;
                   return acc + c.value;
                 }, 0);
@@ -247,15 +247,23 @@ export function History() {
              })}
 
              {listTab === 'Operaciones' && store.operations.map(op => {
-                const sMyPlatform = store.platforms.find(p => p.id === op.sourceMyPlatformId);
-                const sMyAccount = store.accounts.find(a => a.id === op.sourceMyAccountId);
-                const sClientPlatform = store.platforms.find(p => p.id === op.sourceClientPlatformId);
-                const sClientAccount = store.accounts.find(a => a.id === op.sourceClientAccountId);
+                const sourceMyPlatformIdRaw = op.sourceMyPlatformId || op.sourcePlatformId;
+                const sourceMyAccountIdRaw = op.sourceMyAccountId || op.sourceAccountId;
+                const sourceClientAccountIdRaw = op.sourceClientAccountId || op.clientSourceAccountId;
 
-                const dMyPlatform = store.platforms.find(p => p.id === op.destMyPlatformId);
-                const dMyAccount = store.accounts.find(a => a.id === op.destMyAccountId);
+                const destMyPlatformIdRaw = op.destMyPlatformId || op.destPlatformId;
+                const destMyAccountIdRaw = op.destMyAccountId || op.destAccountId;
+                const destClientAccountIdRaw = op.destClientAccountId || op.clientDestAccountId;
+
+                const sMyPlatform = store.platforms.find(p => p.id === sourceMyPlatformIdRaw);
+                const sMyAccount = store.accounts.find(a => a.id === sourceMyAccountIdRaw);
+                const sClientPlatform = store.platforms.find(p => p.id === op.sourceClientPlatformId);
+                const sClientAccount = store.accounts.find(a => a.id === sourceClientAccountIdRaw);
+
+                const dMyPlatform = store.platforms.find(p => p.id === destMyPlatformIdRaw);
+                const dMyAccount = store.accounts.find(a => a.id === destMyAccountIdRaw);
                 const dClientPlatform = store.platforms.find(p => p.id === op.destClientPlatformId);
-                const dClientAccount = store.accounts.find(a => a.id === op.destClientAccountId);
+                const dClientAccount = store.accounts.find(a => a.id === destClientAccountIdRaw);
 
                 return (
                   <div key={op.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
