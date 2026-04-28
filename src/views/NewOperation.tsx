@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   X,
   ArrowUpCircle,
@@ -20,19 +21,41 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
   const store = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [pmModalState, setPmModalState] = useState<{
-    isOpen: boolean;
     currency: string;
     ownerType: 'Mias' | 'Cliente';
     ownerName: string;
     targetState: 'sourceMy' | 'sourceClient' | 'destMy' | 'destClient' | null;
   }>({
-    isOpen: false,
     currency: '',
     ownerType: 'Mias',
     ownerName: 'Mias',
     targetState: null
   });
+
+  const pmModalIsOpen = searchParams.get('pmModal') === 'true';
+
+  const openPmModal = (params: typeof pmModalState) => {
+    setPmModalState(params);
+    setSearchParams(prev => {
+      prev.set('pmModal', 'true');
+      return prev;
+    });
+  };
+
+  const closePmModal = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      setSearchParams(prev => {
+        prev.delete('pmModal');
+        return prev;
+      }, { replace: true });
+    }
+  };
 
   const [type, setType] = useState<"Compra" | "Venta">("Compra");
   const [order, setOrder] = useState<"Maker" | "Taker">("Maker");
@@ -299,11 +322,11 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Medios Propios</h3>
                  <div className="space-y-1 relative">
                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Medio Origen ({sourceCurrency})</label>
-                   <PaymentMethodPicker currency={sourceCurrency} ownerFilter="Mias" value={sourceMyPaymentMethodId} onSelect={setSourceMyPaymentMethodId} onAddNew={() => setPmModalState({ isOpen: true, currency: sourceCurrency, ownerType: 'Mias', ownerName: 'Mias', targetState: 'sourceMy' })} />
+                   <PaymentMethodPicker currency={sourceCurrency} ownerFilter="Mias" value={sourceMyPaymentMethodId} onSelect={setSourceMyPaymentMethodId} onAddNew={() => openPmModal({ currency: sourceCurrency, ownerType: 'Mias', ownerName: 'Mias', targetState: 'sourceMy' })} />
                  </div>
                  <div className="space-y-1 relative">
                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Medio Destino ({destCurrency})</label>
-                   <PaymentMethodPicker currency={destCurrency} ownerFilter="Mias" value={destMyPaymentMethodId} onSelect={setDestMyPaymentMethodId} onAddNew={() => setPmModalState({ isOpen: true, currency: destCurrency, ownerType: 'Mias', ownerName: 'Mias', targetState: 'destMy' })} />
+                   <PaymentMethodPicker currency={destCurrency} ownerFilter="Mias" value={destMyPaymentMethodId} onSelect={setDestMyPaymentMethodId} onAddNew={() => openPmModal({ currency: destCurrency, ownerType: 'Mias', ownerName: 'Mias', targetState: 'destMy' })} />
                  </div>
               </div>
 
@@ -311,11 +334,11 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Medios del Cliente</h3>
                  <div className="space-y-1 relative">
                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Medio Origen Cliente ({destCurrency})</label>
-                   <PaymentMethodPicker currency={destCurrency} ownerFilter="Cliente" onlyOwnerName={clientName} disabled={!clientName} value={sourceClientPaymentMethodId} onSelect={setSourceClientPaymentMethodId} placeholder={clientName ? `Medio de ${clientName}` : 'Selecciona un cliente arriba'} onAddNew={() => setPmModalState({ isOpen: true, currency: destCurrency, ownerType: 'Cliente', ownerName: clientName, targetState: 'sourceClient' })} />
+                   <PaymentMethodPicker currency={destCurrency} ownerFilter="Cliente" onlyOwnerName={clientName} disabled={!clientName} value={sourceClientPaymentMethodId} onSelect={setSourceClientPaymentMethodId} placeholder={clientName ? `Medio de ${clientName}` : 'Selecciona un cliente arriba'} onAddNew={() => openPmModal({ currency: destCurrency, ownerType: 'Cliente', ownerName: clientName, targetState: 'sourceClient' })} />
                  </div>
                  <div className="space-y-1 relative">
                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest">Medio Destino Cliente ({sourceCurrency})</label>
-                   <PaymentMethodPicker currency={sourceCurrency} ownerFilter="Cliente" onlyOwnerName={clientName} disabled={!clientName} value={destClientPaymentMethodId} onSelect={setDestClientPaymentMethodId} placeholder={clientName ? `Medio de ${clientName}` : 'Selecciona un cliente arriba'} onAddNew={() => setPmModalState({ isOpen: true, currency: sourceCurrency, ownerType: 'Cliente', ownerName: clientName, targetState: 'destClient' })} />
+                   <PaymentMethodPicker currency={sourceCurrency} ownerFilter="Cliente" onlyOwnerName={clientName} disabled={!clientName} value={destClientPaymentMethodId} onSelect={setDestClientPaymentMethodId} placeholder={clientName ? `Medio de ${clientName}` : 'Selecciona un cliente arriba'} onAddNew={() => openPmModal({ currency: sourceCurrency, ownerType: 'Cliente', ownerName: clientName, targetState: 'destClient' })} />
                  </div>
               </div>
             </div>
@@ -373,7 +396,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {pmModalState.isOpen && (
+      {pmModalIsOpen && (
         <PaymentMethodModal
           isNew={true}
           pm={{
@@ -387,7 +410,7 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
              platformUserId: '',
              additionalInfo: []
           }}
-          onClose={() => setPmModalState(prev => ({ ...prev, isOpen: false }))}
+          onClose={closePmModal}
           onSuccess={(newId) => {
              if (pmModalState.targetState === 'sourceMy') setSourceMyPaymentMethodId(newId);
              if (pmModalState.targetState === 'sourceClient') setSourceClientPaymentMethodId(newId);
