@@ -1,26 +1,27 @@
 import React, { useState } from 'react';
 import { useAppStore, PaymentMethod } from '../store';
-import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { format, isSameDay, isSameWeek, isSameMonth, isSameYear } from 'date-fns';
+import { format, isSameDay, isSameWeek, isSameMonth, isSameYear, subDays, addDays, subWeeks, addWeeks, subMonths, addMonths, subYears, addYears } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { NewOperation } from './NewOperation';
 
 export function History() {
   const store = useAppStore();
   const [timeFilter, setTimeFilter] = useState('Global');
+  const [referenceDate, setReferenceDate] = useState(new Date());
   const [listTab, setListTab] = useState('Operaciones');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
 
   const filterByTimeAndSearch = (items: any[]) => {
-    const now = new Date();
     return items.filter(item => {
       const itemDate = new Date(item.date);
       let timeMatch = true;
-      if (timeFilter === 'Día') timeMatch = isSameDay(itemDate, now);
-      else if (timeFilter === 'Semana') timeMatch = isSameWeek(itemDate, now);
-      else if (timeFilter === 'Mes') timeMatch = isSameMonth(itemDate, now);
-      else if (timeFilter === 'Año') timeMatch = isSameYear(itemDate, now);
+      if (timeFilter === 'Día') timeMatch = isSameDay(itemDate, referenceDate);
+      else if (timeFilter === 'Semana') timeMatch = isSameWeek(itemDate, referenceDate, { weekStartsOn: 1 });
+      else if (timeFilter === 'Mes') timeMatch = isSameMonth(itemDate, referenceDate);
+      else if (timeFilter === 'Año') timeMatch = isSameYear(itemDate, referenceDate);
 
       let searchMatch = true;
       if (search) {
@@ -29,6 +30,28 @@ export function History() {
       }
       return timeMatch && searchMatch;
     });
+  };
+
+  const handlePrevTime = () => {
+    if (timeFilter === 'Día') setReferenceDate(d => subDays(d, 1));
+    else if (timeFilter === 'Semana') setReferenceDate(d => subWeeks(d, 1));
+    else if (timeFilter === 'Mes') setReferenceDate(d => subMonths(d, 1));
+    else if (timeFilter === 'Año') setReferenceDate(d => subYears(d, 1));
+  };
+
+  const handleNextTime = () => {
+    if (timeFilter === 'Día') setReferenceDate(d => addDays(d, 1));
+    else if (timeFilter === 'Semana') setReferenceDate(d => addWeeks(d, 1));
+    else if (timeFilter === 'Mes') setReferenceDate(d => addMonths(d, 1));
+    else if (timeFilter === 'Año') setReferenceDate(d => addYears(d, 1));
+  };
+
+  const getFormatString = () => {
+    if (timeFilter === 'Día') return "dd 'de' MMMM, yyyy";
+    if (timeFilter === 'Semana') return "'Semana del' dd MMM, yyyy";
+    if (timeFilter === 'Mes') return "MMMM yyyy";
+    if (timeFilter === 'Año') return "yyyy";
+    return "";
   };
 
   const filteredOperations = filterByTimeAndSearch(store.operations);
@@ -46,7 +69,10 @@ export function History() {
             {['Día', 'Semana', 'Mes', 'Año', 'Global'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => setTimeFilter(tab)}
+                onClick={() => {
+                  setTimeFilter(tab);
+                  setReferenceDate(new Date()); // Reset to today when changing filter
+                }}
                 className={cn(
                   "flex-1 min-w-[70px] px-4 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-full transition-all",
                   timeFilter === tab ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-slate-300"
@@ -56,6 +82,23 @@ export function History() {
               </button>
             ))}
           </div>
+
+          {timeFilter !== 'Global' && (
+            <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-xl p-1.5 w-full sm:w-auto mt-2 sm:mt-0">
+              <button onClick={handlePrevTime} className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2 px-2 flex-1 justify-center min-w-[140px]">
+                <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-xs font-bold text-white capitalize whitespace-nowrap">
+                  {format(referenceDate, getFormatString(), { locale: es })}
+                </span>
+              </div>
+              <button onClick={handleNextTime} className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
