@@ -5,7 +5,7 @@ declare global {
   }
 }
 
-const SCOPES = 'https://www.googleapis.com/auth/drive';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 export interface GoogleDriveFile {
   id: string;
@@ -16,48 +16,94 @@ export interface GoogleDriveFile {
 export class GoogleDriveService {
   private accessToken: string | null = null;
   private tokenClient: any = null;
+  private isInitializing = false;
 
   constructor(private clientId: string) {
     this.accessToken = localStorage.getItem('gd_access_token');
   }
 
-  init() {
+  async init() {
+    if (this.isInitializing) return;
+    this.isInitializing = true;
+
     return new Promise<void>((resolve) => {
       const checkGSI = setInterval(() => {
         if (window.google?.accounts?.oauth2) {
           clearInterval(checkGSI);
-          this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: this.clientId,
-            scope: SCOPES,
-            callback: (response: any) => {
-              if (response.error) {
-                console.error('Google Auth Error:', response.error);
-                return;
-              }
-              this.accessToken = response.access_token;
-              localStorage.setItem('gd_access_token', response.access_token);
-              window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
-            },
-          });
           
-          if (this.accessToken) {
-            window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+          try {
+            this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+              client_id: this.clientId,
+              scope: SCOPES,
+              callback: (response: any) => {
+                if (response.error) {
+                  console.error('Google Auth Error:', response.error);
+                  return;
+                }
+                this.accessToken = response.access_token;
+                localStorage.setItem('gd_access_token', response.access_token);
+                window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+              },
+            });
+            
+            if (this.accessToken) {
+              // Validar el token actual
+              this.verifyToken().then(isValid => {
+                if (isValid) {
+                  window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+                } else {
+                  this.logout();
+                }
+              });
+            }
+          } catch (err) {
+            console.error('Error initializing GSI:', err);
           }
+          
+          this.isInitializing = false;
           resolve();
         }
       }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        if (this.isInitializing) {
+          clearInterval(checkGSI);
+          this.isInitializing = false;
+          resolve();
+        }
+      }, 10000);
     });
   }
 
+  private async verifyToken(): Promise<boolean> {
+    if (!this.accessToken) return false;
+    try {
+      const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${this.accessToken}`);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   login() {
+    if (!this.clientId) {
+      alert('Error: Google Client ID no configurado. Verifica tus variables de entorno.');
+      return;
+    }
     if (this.tokenClient) {
-      this.tokenClient.requestAccessToken({ prompt: this.accessToken ? '' : 'consent' });
+      this.tokenClient.requestAccessToken({ prompt: this.accessToken ? '' : 'select_account' });
+    } else {
+      this.init().then(() => {
+        if (this.tokenClient) this.tokenClient.requestAccessToken({ prompt: 'select_account' });
+      });
     }
   }
 
   logout() {
     this.accessToken = null;
     localStorage.removeItem('gd_access_token');
+    window.dispatchEvent(new CustomEvent('googledrive_auth_expired'));
   }
 
   isAuthenticated() {
@@ -66,11 +112,11 @@ export class GoogleDriveService {
 
   private handleUnauthorized() {
     this.logout();
-    window.dispatchEvent(new CustomEvent('googledrive_auth_expired'));
   }
 
   async listFolders(): Promise<GoogleDriveFile[]> {
     if (!this.accessToken) throw new Error('Not authenticated');
+    // Al usar drive.file, solo veremos carpetas creadas por esta app
     const q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
     const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },

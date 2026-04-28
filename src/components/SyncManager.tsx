@@ -5,15 +5,27 @@ import JSZip from 'jszip';
 
 export function SyncManager() {
   const store = useAppStore();
+  const [isAuthenticated, setIsAuthenticated] = React.useState(driveService.isAuthenticated());
   const lastSyncRef = useRef<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     driveService.init();
+
+    const handleAuth = () => setIsAuthenticated(true);
+    const handleExpired = () => setIsAuthenticated(false);
+
+    window.addEventListener('googledrive_auth_success', handleAuth);
+    window.addEventListener('googledrive_auth_expired', handleExpired);
+
+    return () => {
+      window.removeEventListener('googledrive_auth_success', handleAuth);
+      window.removeEventListener('googledrive_auth_expired', handleExpired);
+    };
   }, []);
 
   useEffect(() => {
-    if (!store.isAutoSyncEnabled || !store.driveFolderId || !driveService.isAuthenticated()) {
+    if (!store.isAutoSyncEnabled || !store.driveFolderId || !isAuthenticated) {
       return;
     }
 
@@ -83,7 +95,8 @@ export function SyncManager() {
     store.currencies, 
     store.paymentMethods,
     store.isAutoSyncEnabled,
-    store.driveFolderId
+    store.driveFolderId,
+    isAuthenticated
   ]);
 
   return null;

@@ -342,6 +342,11 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
 
               {isShowingFolderPicker && (
                 <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+                  <div className="bg-blue-500/10 border border-blue-500/20 p-2 rounded-lg mb-2">
+                    <p className="text-[9px] text-blue-400 font-medium leading-tight">
+                      Nota de seguridad: Por privacidad, solo se muestran las carpetas creadas por esta aplicación.
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Tus carpetas en Drive</span>
                     <button 

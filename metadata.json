@@ -1,6 +1,6 @@
 {
   "name": "herramientas-p2p",
-  "description": "",
+  "description": "Herramienta de gestión de operaciones P2P con sincronización segura en Google Drive.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
