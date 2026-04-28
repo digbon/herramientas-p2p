@@ -87,11 +87,11 @@ export function Balance() {
         <div className="grid grid-cols-3 gap-3 mb-6">
            <button onClick={() => setIsDepositOpen(true)} className="bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/5">
              <PlusCircle className="w-5 h-5" />
-             <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">Capital</span>
+             <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">Depositar</span>
            </button>
            <button onClick={() => setIsWithdrawOpen(true)} className="bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-amber-500/5">
              <MinusCircle className="w-5 h-5" />
-             <span className="text-[10px] uppercase font-black tracking-widest text-amber-400/80">Retiro</span>
+             <span className="text-[10px] uppercase font-black tracking-widest text-amber-400/80">Retirar</span>
            </button>
            <button 
              onClick={() => {
