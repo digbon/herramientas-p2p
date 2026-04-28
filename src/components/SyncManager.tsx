@@ -17,10 +17,12 @@ export function SyncManager() {
 
     window.addEventListener('googledrive_auth_success', handleAuth);
     window.addEventListener('googledrive_auth_expired', handleExpired);
+    window.addEventListener('googledrive_auth_missing_scopes', handleExpired);
 
     return () => {
       window.removeEventListener('googledrive_auth_success', handleAuth);
       window.removeEventListener('googledrive_auth_expired', handleExpired);
+      window.removeEventListener('googledrive_auth_missing_scopes', handleExpired);
     };
   }, []);
 
@@ -83,7 +85,7 @@ export function SyncManager() {
       } catch (error) {
         console.error('Auto-sync failed:', error);
       }
-    }, 5000); // 5 seconds debounce
+    }, 60000); // 60 seconds debounce to prevent Google Drive rate limit (403)
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);

@@ -5,7 +5,7 @@ declare global {
   }
 }
 
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive';
 
 export interface GoogleDriveFile {
   id: string;
@@ -19,7 +19,7 @@ export class GoogleDriveService {
   private isInitializing = false;
 
   constructor(private clientId: string) {
-    this.accessToken = localStorage.getItem('gd_access_token');
+    this.accessToken = localStorage.getItem('gd_token_v2');
   }
 
   async init() {
@@ -27,59 +27,73 @@ export class GoogleDriveService {
     this.isInitializing = true;
 
     return new Promise<void>((resolve) => {
+      let attempts = 0;
       const checkGSI = setInterval(() => {
+        attempts++;
         if (window.google?.accounts?.oauth2) {
           clearInterval(checkGSI);
           
-          try {
-            this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-              client_id: this.clientId,
-              scope: SCOPES,
-              callback: (response: any) => {
-                if (response.error) {
-                  console.error('Google Auth Error:', response.error);
-                  return;
-                }
-                this.accessToken = response.access_token;
-                localStorage.setItem('gd_access_token', response.access_token);
-                window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
-              },
-            });
-            
-            if (this.accessToken) {
-              // Validar el token actual
-              this.verifyToken().then(isValid => {
-                if (isValid) {
-                  window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
-                } else {
+      try {
+        if (!this.tokenClient) {
+          this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: this.clientId,
+            scope: SCOPES,
+            callback: (response: any) => {
+              if (response.error) {
+                console.error('Google Auth Error:', response.error);
+                if (response.error === 'access_denied') {
                   this.logout();
                 }
-              });
+                return;
+              }
+              
+              // Validate that the requested scope was actually granted by the user
+              if (!window.google.accounts.oauth2.hasGrantedAllScopes(response, SCOPES)) {
+                console.error('User did not grant all required scopes.');
+                this.logout();
+                window.dispatchEvent(new CustomEvent('googledrive_auth_missing_scopes'));
+                return;
+              }
+
+              this.accessToken = response.access_token;
+              localStorage.setItem('gd_token_v2', response.access_token);
+              window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+            },
+          });
+        }
+        
+        if (this.accessToken) {
+          // Validar el token actual solo si existe
+          this.verifyToken().then(isValid => {
+            if (isValid) {
+              window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+            } else {
+              this.handleUnauthorized();
             }
-          } catch (err) {
+          });
+        }
+      } catch (err) {
             console.error('Error initializing GSI:', err);
           }
           
           this.isInitializing = false;
           resolve();
-        }
-      }, 100);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (this.isInitializing) {
+        } else if (attempts > 50) { // 5 seconds
           clearInterval(checkGSI);
           this.isInitializing = false;
           resolve();
         }
-      }, 10000);
+      }, 100);
     });
   }
 
-  private async verifyToken(): Promise<boolean> {
+  async verifyToken(): Promise<boolean> {
     if (!this.accessToken) return false;
     try {
-      const response = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${this.accessToken}`);
+      // Usar el endpoint de about es más ligero y confirma autenticación
+      const response = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        headers: { Authorization: `Bearer ${this.accessToken}` }
+      });
       return response.ok;
     } catch {
       return false;
@@ -87,22 +101,62 @@ export class GoogleDriveService {
   }
 
   login() {
-    if (!this.clientId) {
-      alert('Error: Google Client ID no configurado. Verifica tus variables de entorno.');
+    const googleClientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
+    if (!this.clientId && !googleClientId) {
+      console.error('Google Client ID no configurado.');
       return;
     }
-    if (this.tokenClient) {
-      this.tokenClient.requestAccessToken({ prompt: this.accessToken ? '' : 'select_account' });
-    } else {
-      this.init().then(() => {
-        if (this.tokenClient) this.tokenClient.requestAccessToken({ prompt: 'select_account' });
+    
+    // Update clientId if it was empty before
+    if (!this.clientId) this.clientId = googleClientId;
+
+    if (!window.google?.accounts?.oauth2) {
+      console.error('Google Identity Services no está cargado aún');
+      alert('La conexión con Google Drive aún se está cargando. Por favor, intenta de nuevo en un segundo.');
+      return;
+    }
+
+    if (!this.tokenClient) {
+      this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: this.clientId,
+        scope: SCOPES,
+        callback: (response: any) => {
+          if (response.error) {
+            console.error('Google Auth Error:', response.error);
+            if (response.error === 'access_denied') {
+              this.logout();
+            }
+            return;
+          }
+          
+          if (!window.google.accounts.oauth2.hasGrantedAllScopes(response, SCOPES)) {
+            console.error('User did not grant all required scopes.');
+            this.logout();
+            window.dispatchEvent(new CustomEvent('googledrive_auth_missing_scopes'));
+            return;
+          }
+
+          this.accessToken = response.access_token;
+          localStorage.setItem('gd_token_v2', response.access_token);
+          window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
+        },
       });
+    }
+
+    try {
+      this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (e) {
+      console.error('Popup blocked:', e);
+      alert('Por favor, permite el uso de ventanas emergentes (popups) en tu navegador para conectar con Google Drive.');
     }
   }
 
   logout() {
+    if (this.accessToken && window.google?.accounts?.oauth2) {
+      window.google.accounts.oauth2.revoke(this.accessToken);
+    }
     this.accessToken = null;
-    localStorage.removeItem('gd_access_token');
+    localStorage.removeItem('gd_token_v2');
     window.dispatchEvent(new CustomEvent('googledrive_auth_expired'));
   }
 
@@ -111,26 +165,51 @@ export class GoogleDriveService {
   }
 
   private handleUnauthorized() {
-    this.logout();
+    this.accessToken = null;
+    localStorage.removeItem('gd_token_v2');
+    window.dispatchEvent(new CustomEvent('googledrive_auth_expired'));
+  }
+
+  private async handleApiError(response: Response, defaultMessage: string): Promise<never> {
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Sesión expirada. Por favor, vuelve a reconectar.');
+    }
+    
+    let errorData: any = {};
+    try {
+      errorData = await response.json();
+    } catch {
+      // Ignored
+    }
+    
+    console.error(`Drive API Error (${response.status}):`, errorData);
+    
+    if (response.status === 403) {
+      const msg = errorData.error?.message?.toLowerCase() || '';
+      if (msg.includes('rate') || msg.includes('quota')) {
+        throw new Error('Límite de Google Drive alcanzado (403). Intenta más tarde.');
+      } else if (msg.includes('disabled')) {
+        throw new Error('La API de Google Drive no está habilitada en tu proyecto de Google Cloud. Habilítala desde tu consola de desarrollador.');
+      } else {
+        throw new Error(`Error de permisos (403): ${errorData.error?.message || 'Reconecta y marca TODAS las casillas de Drive en la ventana emergente.'}`);
+      }
+    }
+    
+    throw new Error(`${defaultMessage}: ${errorData.error?.message || response.status}`);
   }
 
   async listFolders(): Promise<GoogleDriveFile[]> {
     if (!this.accessToken) throw new Error('Not authenticated');
-    // Al usar drive.file, solo veremos carpetas creadas por esta app
+    
+    // Obtenemos solo carpetas que no están en la papelera
     const q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
     
-    if (response.status === 401 || response.status === 403) {
-      this.handleUnauthorized();
-      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar con Google.');
-    }
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Drive API Error (Folders):', response.status, errorData);
-      throw new Error(`Error al listar carpetas (${response.status})`);
+      await this.handleApiError(response, 'Error al listar carpetas');
     }
     const data = await response.json();
     return data.files || [];
@@ -150,22 +229,17 @@ export class GoogleDriveService {
       }),
     });
 
-    if (response.status === 401 || response.status === 403) {
-      this.handleUnauthorized();
-      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
-    }
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Drive API Error (Create Folder):', response.status, errorData);
-      throw new Error(`Error al crear carpeta (${response.status})`);
+      await this.handleApiError(response, 'Error al crear carpeta');
     }
     const data = await response.json();
     return data.id;
   }
 
   async listBackups(folderId?: string | null): Promise<GoogleDriveFile[]> {
-    if (!this.accessToken) throw new Error('Not authenticated');
+    if (!this.accessToken) {
+      throw new Error('Not authenticated');
+    }
 
     let q = 'name contains "p2p-backup" and mimeType = "application/zip" and trashed = false';
     if (folderId) {
@@ -173,7 +247,7 @@ export class GoogleDriveService {
     }
 
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=modifiedTime desc`,
       {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -181,15 +255,8 @@ export class GoogleDriveService {
       }
     );
 
-    if (response.status === 401 || response.status === 403) {
-      this.handleUnauthorized();
-      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
-    }
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Drive API Error (Backups):', response.status, errorData);
-      throw new Error(`Error al listar respaldos (${response.status})`);
+      await this.handleApiError(response, 'Error al listar respaldos');
     }
 
     const data = await response.json();
@@ -199,39 +266,59 @@ export class GoogleDriveService {
   async uploadBackup(blob: Blob, filename: string, folderId?: string | null) {
     if (!this.accessToken) throw new Error('Not authenticated');
 
-    const metadata: any = {
-      name: filename,
-      mimeType: 'application/zip',
-    };
+    let existingFileId: string | null = null;
+    
+    // Buscar si ya existe un archivo con el mismo nombre
+    try {
+      let q = `name = '${filename}' and trashed = false`;
+      if (folderId) {
+        q += ` and '${folderId}' in parents`;
+      }
+      const searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+        {
+          headers: { Authorization: `Bearer ${this.accessToken}` }
+        }
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        if (searchData.files && searchData.files.length > 0) {
+          existingFileId = searchData.files[0].id;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not search for existing backup file.', e);
+    }
 
-    if (folderId) {
-      metadata.parents = [folderId];
+    const metadata: any = {};
+    if (!existingFileId) {
+      metadata.name = filename;
+      metadata.mimeType = 'application/zip';
+      if (folderId) {
+        metadata.parents = [folderId];
+      }
     }
 
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', blob);
 
-    const response = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-        body: form,
-      }
-    );
+    const url = existingFileId 
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+      
+    const method = existingFileId ? 'PATCH' : 'POST';
 
-    if (response.status === 401 || response.status === 403) {
-      this.handleUnauthorized();
-      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
-    }
+    const response = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+      body: form,
+    });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Drive API Error (Upload):', response.status, errorData);
-      throw new Error(`Error al subir respaldo (${response.status})`);
+      await this.handleApiError(response, 'Error al subir respaldo');
     }
 
     return await response.json();
@@ -241,7 +328,7 @@ export class GoogleDriveService {
     if (!this.accessToken) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -249,14 +336,8 @@ export class GoogleDriveService {
       }
     );
 
-    if (response.status === 401 || response.status === 403) {
-      this.handleUnauthorized();
-      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
-    }
-
     if (!response.ok) {
-      console.error('Drive API Error (Download):', response.status);
-      throw new Error(`Error al descargar respaldo (${response.status})`);
+      await this.handleApiError(response, 'Error al descargar respaldo');
     }
 
     return await response.blob();

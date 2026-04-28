@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle, BookOpen, ArrowRight, Archive, Cloud, LogIn, LogOut, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { FolderUp, Download, Upload, RotateCcw, Plus, X, Pencil, ChevronDown, Search, MinusCircle, BookOpen, ArrowRight, Archive, Cloud, LogIn, LogOut, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -15,6 +15,7 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
   const [isShowingFolderPicker, setIsShowingFolderPicker] = useState(false);
 
   useEffect(() => {
+    driveService.init(); // Eager load script for GSI
     const handleAuth = () => {
       setIsDriveAuth(true);
       loadDriveData();
@@ -25,6 +26,11 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       setDriveFiles([]);
       setDriveFolders([]);
     };
+
+    const handleMissingScopes = () => {
+      setIsDriveAuth(false);
+      alert('⚠️ Permisos Insuficientes:\n\nDebes marcar la casilla para permitir que la aplicación acceda a Google Drive en la ventana de conexión.');
+    };
     
     if (driveService.isAuthenticated()) {
       handleAuth();
@@ -32,31 +38,33 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
     
     window.addEventListener('googledrive_auth_success', handleAuth);
     window.addEventListener('googledrive_auth_expired', handleExpired);
+    window.addEventListener('googledrive_auth_missing_scopes', handleMissingScopes);
     return () => {
       window.removeEventListener('googledrive_auth_success', handleAuth);
       window.removeEventListener('googledrive_auth_expired', handleExpired);
+      window.removeEventListener('googledrive_auth_missing_scopes', handleMissingScopes);
     };
   }, []);
 
   const loadDriveData = async () => {
-    if (!driveService.isAuthenticated()) return;
+    if (!driveService.isAuthenticated() || isLoadingDrive) return;
     setIsLoadingDrive(true);
     try {
-      const [files, folders] = await Promise.all([
-        driveService.listBackups(store.driveFolderId).catch(err => {
-          console.error("Backups fail:", err);
-          return [] as GoogleDriveFile[];
-        }),
-        driveService.listFolders().catch(err => {
-          console.error("Folders fail:", err);
-          return [] as GoogleDriveFile[];
-        })
-      ]);
-      setDriveFiles(files);
+      // Intentamos cargar por separado para que uno no rompa al otro
+      const folders = await driveService.listFolders();
       setDriveFolders(folders);
+
+      const backups = await driveService.listBackups(store.driveFolderId);
+      setDriveFiles(backups);
+      
     } catch (error: any) {
-      console.error('Error general loading drive data:', error);
-      // If it's a session error, the driveService will handle the event
+      if (error.message.includes('No autenticado') || error.message.includes('Not authenticated')) {
+         // Silently ignore if not authenticated
+      } else if (error.message.includes('Permisos') || error.message.includes('403')) {
+         console.warn("Drive access need to be re-authorized.");
+      } else {
+         console.error('Error general al cargar datos de Drive:', error);
+      }
     } finally {
       setIsLoadingDrive(false);
     }
@@ -123,9 +131,9 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       await driveService.uploadBackup(blob, filename, store.driveFolderId);
       alert('¡Copia de seguridad subida a Google Drive con éxito!');
       loadDriveData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in cloud backup:', error);
-      alert('Error al subir la copia a la nube.');
+      alert(error.message || 'Error al subir la copia a la nube.');
     } finally {
       setIsLoadingDrive(false);
     }
@@ -149,9 +157,9 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
         store.importData(importedData);
         alert('¡Copia de seguridad restaurada con éxito!');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in cloud restore:', error);
-      alert('Error al restaurar desde la nube.');
+      alert(error.message || 'Error al restaurar desde la nube.');
     } finally {
       setIsLoadingDrive(false);
     }
@@ -280,11 +288,24 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       <SectionCard title="Respaldos en la Nube" icon={<Cloud className="w-4 h-4 text-blue-400" />}>
         {!isDriveAuth ? (
           <div className="text-center py-6 space-y-4">
+            {store.isAutoSyncEnabled && store.driveFolderId && (
+              <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl mb-6 text-left flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-bold text-red-400 mb-1">Sesión Expirada</h4>
+                  <p className="text-[10px] text-red-300/80 leading-relaxed">
+                    Por seguridad, la sesión de Google Drive expira periódicamente. Reconecta tu cuenta para continuar con la sincronización automática.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="w-16 h-16 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/20 shadow-lg shadow-blue-500/5">
               <Cloud className="w-8 h-8 text-blue-500" />
             </div>
             <p className="text-sm text-slate-400 max-w-[200px] mx-auto">Conecta tu cuenta de Google para respaldar tus datos en Drive.</p>
             <button 
+              type="button"
               onClick={() => driveService.login()}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mx-auto transition-all shadow-lg shadow-blue-600/20 active:scale-95"
             >
@@ -342,11 +363,6 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
 
               {isShowingFolderPicker && (
                 <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
-                  <div className="bg-blue-500/10 border border-blue-500/20 p-2 rounded-lg mb-2">
-                    <p className="text-[9px] text-blue-400 font-medium leading-tight">
-                      Nota de seguridad: Por privacidad, solo se muestran las carpetas creadas por esta aplicación.
-                    </p>
-                  </div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Tus carpetas en Drive</span>
                     <button 
@@ -358,7 +374,15 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
                   </div>
                   <div className="max-h-40 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                     {driveFolders.length === 0 ? (
-                      <p className="text-[10px] text-slate-600 italic text-center py-2">No se encontraron carpetas</p>
+                      <div className="py-4 px-2 text-center">
+                        <p className="text-[10px] text-slate-500 italic mb-2">No se encontraron carpetas en tu Google Drive</p>
+                        <button 
+                          onClick={handleCreateFolder}
+                          className="text-[9px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/20 px-3 py-1.5 rounded-lg hover:bg-blue-500/10 transition-all"
+                        >
+                          Crear carpeta ahora
+                        </button>
+                      </div>
                     ) : (
                       driveFolders.map(folder => (
                         <button
