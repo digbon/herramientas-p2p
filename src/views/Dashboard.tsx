@@ -326,9 +326,6 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
               )}>
                 {totalProfitBase.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-lg">{selectedCurrency}</span>
               </div>
-              <div className="text-slate-400 text-[11px] font-black tracking-widest">
-                {totalProfitSecondary >= 0 ? '+' : ''} {(totalProfitSecondary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} {secondaryCurrencySymbol}
-              </div>
             </div>
 
             {/* Percentage / Days Gain Loss */}
@@ -433,11 +430,8 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
         <div className="bg-[#151c2c] rounded-[1.5rem] p-6 border border-white/5 text-center relative overflow-hidden flex flex-col items-center shadow-lg">
            <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-[#1e293b] border-2 border-slate-700" />
            <div className="text-slate-400 text-[13px] font-bold mb-3 tracking-wide flex items-center justify-center">Ganancia/Pérdida (Periodo)</div>
-           <div className={cn("text-4xl font-black mb-2 tracking-tight", isPositive ? "text-emerald-400" : "text-white")}>
-             {totalProfitSecondary.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-xl">{secondaryCurrencySymbol}</span>
-           </div>
-           <div className="text-slate-400 text-[13px] font-bold mb-5 tracking-wide">
-             ({totalProfitBase.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} {selectedCurrency})
+           <div className={cn("text-4xl font-black mb-4 tracking-tight", isPositive ? "text-emerald-400" : "text-white")}>
+             {totalProfitBase.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} <span className="text-xl">{selectedCurrency}</span>
            </div>
            <div className="bg-emerald-500/10 text-emerald-400 px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 border border-emerald-500/20 shadow-sm">
              {profitabilityPercentage.toFixed(2)}% <TrendingUp className="w-3.5 h-3.5" />
