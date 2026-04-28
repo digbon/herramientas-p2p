@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore, PaymentMethod } from '../store';
 import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -8,11 +9,54 @@ import { NewOperation } from './NewOperation';
 
 export function History() {
   const store = useAppStore();
-  const [timeFilter, setTimeFilter] = useState('Global');
-  const [referenceDate, setReferenceDate] = useState(new Date());
-  const [listTab, setListTab] = useState('Operaciones');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const timeFilter = searchParams.get('time') || 'Global';
+  const listTab = searchParams.get('tab') || 'Operaciones';
+  const dateParam = searchParams.get('date');
+  const referenceDate = dateParam ? new Date(dateParam + 'T12:00:00') : new Date();
+
+  // Modals as query params (for proper back button support)
+  const isModalOpen = searchParams.get('modal') === 'new_operation';
+
   const [search, setSearch] = useState('');
+
+  const setTimeFilter = (val: string) => {
+    setSearchParams(prev => { 
+      prev.set('time', val); 
+      prev.delete('date'); 
+      return prev; 
+    });
+  };
+
+  const setReferenceDate = (date: Date | ((prev: Date) => Date)) => {
+    const newDate = typeof date === 'function' ? date(referenceDate) : date;
+    setSearchParams(prev => { 
+      prev.set('date', format(newDate, 'yyyy-MM-dd')); 
+      return prev; 
+    });
+  };
+
+  const setListTab = (val: string) => {
+    setSearchParams(prev => { 
+      prev.set('tab', val); 
+      return prev; 
+    });
+  };
+
+  const setIsModalOpen = (isOpen: boolean) => {
+    if (isOpen) {
+      setSearchParams(prev => { prev.set('modal', 'new_operation'); return prev; });
+    } else {
+      if (window.history.state && window.history.state.idx > 0) {
+        navigate(-1);
+      } else {
+        setSearchParams(prev => { prev.delete('modal'); return prev; }, { replace: true });
+      }
+    }
+  };
 
   const filterByTimeAndSearch = (items: any[]) => {
     return items.filter(item => {

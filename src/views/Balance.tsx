@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore, PaymentMethod, InfoRecord } from '../store';
 import { PlusCircle, MinusCircle, X, Pencil, Plus, ChevronDown, Wallet, Search, Trash2, ArrowRightLeft, Upload, Link2 } from 'lucide-react';
 import { cn, formatPMName } from '../lib/utils';
@@ -9,16 +10,50 @@ import { PaymentMethodModal } from '../components/PaymentMethodModal';
 
 export function Balance() {
   const store = useAppStore();
-  const [isDepositOpen, setIsDepositOpen] = useState(false);
-  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [transferCurrency, setTransferCurrency] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const isDepositOpen = searchParams.get('modal') === 'deposit';
+  const isWithdrawOpen = searchParams.get('modal') === 'withdraw';
+  const isTransferOpen = searchParams.get('modal') === 'transfer';
+  const isPMEditOpen = searchParams.get('modal') === 'edit_pm';
+  const isPMNewOpen = searchParams.get('modal') === 'new_pm';
   
+  const transferCurrency = searchParams.get('currency') || '';
+  const pmIdToEdit = searchParams.get('pm_id') || '';
+
   const [newCurrency, setNewCurrency] = useState('');
   const [newCurrencyType, setNewCurrencyType] = useState<'Fiat'|'Crypto'>('Fiat');
 
-  const [paymentMethodToEdit, setPaymentMethodToEdit] = useState<PaymentMethod | null>(null);
-  const [isNewPM, setIsNewPM] = useState(false);
+  // We fall back to a derived object if creating anew
+  const paymentMethodToEdit = isPMEditOpen && pmIdToEdit
+    ? store.paymentMethods.find(p => p.id === pmIdToEdit)
+    : isPMNewOpen
+    ? {
+        id: Date.now().toString(),
+        orderNumber: 0,
+        platformChannel: '',
+        ownerName: '',
+        platformUserId: '',
+        currency: transferCurrency, // using transferCurrency for passing pm currency on creation
+        initialBalance: 0,
+        ownerType: 'Mias',
+        additionalInfo: []
+      } as PaymentMethod
+    : null;
+
+  const closeModal = () => {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      setSearchParams(prev => { 
+        prev.delete('modal'); 
+        prev.delete('currency'); 
+        prev.delete('pm_id'); 
+        return prev; 
+      }, { replace: true });
+    }
+  };
 
   const getSaldoActual = (pmId: string) => getAccountBalance(pmId, store);
 
@@ -85,19 +120,16 @@ export function Balance() {
         <p className="text-sm text-slate-400 mb-4">Gestiona tus medios de pago por moneda y canal.</p>
         
         <div className="grid grid-cols-3 gap-3 mb-6">
-           <button onClick={() => setIsDepositOpen(true)} className="bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/5">
+           <button onClick={() => setSearchParams({ modal: 'deposit' })} className="bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/5">
              <PlusCircle className="w-5 h-5" />
              <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400/80">Depositar</span>
            </button>
-           <button onClick={() => setIsWithdrawOpen(true)} className="bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-amber-500/5">
+           <button onClick={() => setSearchParams({ modal: 'withdraw' })} className="bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-amber-500/5">
              <MinusCircle className="w-5 h-5" />
              <span className="text-[10px] uppercase font-black tracking-widest text-amber-400/80">Retirar</span>
            </button>
            <button 
-             onClick={() => {
-               setTransferCurrency(store.baseCrypto);
-               setIsTransferOpen(true);
-             }} 
+             onClick={() => setSearchParams({ modal: 'transfer', currency: store.baseCrypto })}
              className="bg-blue-600/20 text-blue-500 border border-blue-500/30 hover:bg-blue-600/30 transition-colors py-4 rounded-xl font-semibold flex flex-col items-center justify-center gap-1 shadow-lg shadow-blue-500/5"
            >
              <ArrowRightLeft className="w-5 h-5" />
@@ -125,20 +157,7 @@ export function Balance() {
                      </div>
                    </div>
                    <button 
-                     onClick={() => {
-                        setPaymentMethodToEdit({ 
-                          id: Date.now().toString(), 
-                          orderNumber: 0,
-                          platformChannel: '',
-                          ownerName: '',
-                          platformUserId: '',
-                          currency: currency.symbol,
-                          initialBalance: 0,
-                          ownerType: 'Mias',
-                          additionalInfo: []
-                        } as PaymentMethod);
-                        setIsNewPM(true);
-                      }}
+                     onClick={() => setSearchParams({ modal: 'new_pm', currency: currency.symbol })}
                      className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
                    >
                      <Plus className="w-4 h-4" /> Nuevo Medio
@@ -164,10 +183,7 @@ export function Balance() {
                              <PaymentMethodCard 
                                key={pm.id} 
                                pm={pm} 
-                               onAddInfo={() => {
-                                  setPaymentMethodToEdit(pm);
-                                  setIsNewPM(false);
-                               }}
+                               onAddInfo={() => setSearchParams({ modal: 'edit_pm', pm_id: pm.id })}
                              />
                           ))}
                         </div>
@@ -269,12 +285,10 @@ export function Balance() {
         </div>
       </div>
 
-      {/* Basic modals for deposit/withdrawal to pass compilation, will need proper PM handling */}
-      {isDepositOpen && <CapitalModal type="Deposit" onClose={() => setIsDepositOpen(false)} />}
-      {isWithdrawOpen && <CapitalModal type="Withdrawal" onClose={() => setIsWithdrawOpen(false)} />}
-      {isTransferOpen && <TransferModal currency={transferCurrency} onClose={() => setIsTransferOpen(false)} />}
-
-      {paymentMethodToEdit && <PaymentMethodModal pm={paymentMethodToEdit} isNew={isNewPM} onClose={() => setPaymentMethodToEdit(null)} />}
+      {isDepositOpen && <CapitalModal type="Deposit" onClose={closeModal} />}
+      {isWithdrawOpen && <CapitalModal type="Withdrawal" onClose={closeModal} />}
+      {isTransferOpen && <TransferModal currency={transferCurrency} onClose={closeModal} />}
+      {paymentMethodToEdit && (isPMEditOpen || isPMNewOpen) && <PaymentMethodModal pm={paymentMethodToEdit} isNew={isPMNewOpen} onClose={closeModal} />}
     </div>
   );
 }
