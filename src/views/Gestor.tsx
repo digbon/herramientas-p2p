@@ -43,13 +43,20 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
     setIsLoadingDrive(true);
     try {
       const [files, folders] = await Promise.all([
-        driveService.listBackups(store.driveFolderId),
-        driveService.listFolders()
+        driveService.listBackups(store.driveFolderId).catch(err => {
+          console.error("Backups fail:", err);
+          return [] as GoogleDriveFile[];
+        }),
+        driveService.listFolders().catch(err => {
+          console.error("Folders fail:", err);
+          return [] as GoogleDriveFile[];
+        })
       ]);
       setDriveFiles(files);
       setDriveFolders(folders);
-    } catch (error) {
-      console.error('Error loading drive data:', error);
+    } catch (error: any) {
+      console.error('Error general loading drive data:', error);
+      // If it's a session error, the driveService will handle the event
     } finally {
       setIsLoadingDrive(false);
     }

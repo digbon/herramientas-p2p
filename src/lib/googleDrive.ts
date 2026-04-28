@@ -72,16 +72,20 @@ export class GoogleDriveService {
   async listFolders(): Promise<GoogleDriveFile[]> {
     if (!this.accessToken) throw new Error('Not authenticated');
     const q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=name`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=name&supportsAllDrives=true&includeItemsFromAllDrives=true`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
     
     if (response.status === 401) {
       this.handleUnauthorized();
-      throw new Error('Session expired');
+      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
     }
 
-    if (!response.ok) throw new Error('Failed to list folders');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Drive API Error (Folders):', response.status, errorData);
+      throw new Error(`Error al listar carpetas (${response.status})`);
+    }
     const data = await response.json();
     return data.files || [];
   }
@@ -102,10 +106,14 @@ export class GoogleDriveService {
 
     if (response.status === 401) {
       this.handleUnauthorized();
-      throw new Error('Session expired');
+      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
     }
 
-    if (!response.ok) throw new Error('Failed to create folder');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Drive API Error (Create Folder):', response.status, errorData);
+      throw new Error(`Error al crear carpeta (${response.status})`);
+    }
     const data = await response.json();
     return data.id;
   }
@@ -119,7 +127,7 @@ export class GoogleDriveService {
     }
 
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=modifiedTime desc`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=modifiedTime desc&supportsAllDrives=true&includeItemsFromAllDrives=true`,
       {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -129,15 +137,17 @@ export class GoogleDriveService {
 
     if (response.status === 401) {
       this.handleUnauthorized();
-      throw new Error('Session expired');
+      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
-      throw new Error('Failed to list backups');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Drive API Error (Backups):', response.status, errorData);
+      throw new Error(`Error al listar respaldos (${response.status})`);
     }
 
     const data = await response.json();
-    return data.files;
+    return data.files || [];
   }
 
   async uploadBackup(blob: Blob, filename: string, folderId?: string | null) {
@@ -157,7 +167,7 @@ export class GoogleDriveService {
     form.append('file', blob);
 
     const response = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true',
       {
         method: 'POST',
         headers: {
@@ -169,11 +179,13 @@ export class GoogleDriveService {
 
     if (response.status === 401) {
       this.handleUnauthorized();
-      throw new Error('Session expired');
+      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
-      throw new Error('Failed to upload backup');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Drive API Error (Upload):', response.status, errorData);
+      throw new Error(`Error al subir respaldo (${response.status})`);
     }
 
     return await response.json();
@@ -183,7 +195,7 @@ export class GoogleDriveService {
     if (!this.accessToken) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
       {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -193,11 +205,12 @@ export class GoogleDriveService {
 
     if (response.status === 401) {
       this.handleUnauthorized();
-      throw new Error('Session expired');
+      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
-      throw new Error('Failed to download backup');
+      console.error('Drive API Error (Download):', response.status);
+      throw new Error(`Error al descargar respaldo (${response.status})`);
     }
 
     return await response.blob();
