@@ -199,11 +199,11 @@ export class GoogleDriveService {
     throw new Error(`${defaultMessage}: ${errorData.error?.message || response.status}`);
   }
 
-  async listFolders(): Promise<GoogleDriveFile[]> {
+  async listFolders(parentId: string = 'root'): Promise<GoogleDriveFile[]> {
     if (!this.accessToken) throw new Error('Not authenticated');
     
-    // Obtenemos solo carpetas que no están en la papelera
-    const q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+    // Obtenemos solo carpetas que no están en la papelera y pertenezcan al parent actual
+    const q = `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
     const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
@@ -215,7 +215,7 @@ export class GoogleDriveService {
     return data.files || [];
   }
 
-  async createFolder(name: string): Promise<string> {
+  async createFolder(name: string, parentId: string = 'root'): Promise<string> {
     if (!this.accessToken) throw new Error('Not authenticated');
     const response = await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
@@ -226,6 +226,7 @@ export class GoogleDriveService {
       body: JSON.stringify({
         name,
         mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentId],
       }),
     });
 
@@ -299,9 +300,19 @@ export class GoogleDriveService {
       }
     }
 
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', blob);
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+
+    const multipartBody = new Blob([
+      delimiter,
+      'Content-Type: application/json\r\n\r\n',
+      JSON.stringify(metadata),
+      delimiter,
+      'Content-Type: application/zip\r\n\r\n',
+      blob,
+      closeDelimiter
+    ], { type: `multipart/related; boundary=${boundary}` });
 
     const url = existingFileId 
       ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
@@ -314,7 +325,7 @@ export class GoogleDriveService {
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
       },
-      body: form,
+      body: multipartBody,
     });
 
     if (!response.ok) {

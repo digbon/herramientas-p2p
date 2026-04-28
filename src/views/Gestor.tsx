@@ -13,6 +13,7 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
   const [driveFolders, setDriveFolders] = useState<GoogleDriveFile[]>([]);
   const [isLoadingDrive, setIsLoadingDrive] = useState(false);
   const [isShowingFolderPicker, setIsShowingFolderPicker] = useState(false);
+  const [currentNavPath, setCurrentNavPath] = useState<{id: string, name: string}[]>([{id: 'root', name: 'Mi Unidad'}]);
 
   useEffect(() => {
     driveService.init(); // Eager load script for GSI
@@ -46,12 +47,25 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
     };
   }, []);
 
+  const loadFolders = async (parentId: string) => {
+    if (!driveService.isAuthenticated()) return;
+    setIsLoadingDrive(true);
+    try {
+      const folders = await driveService.listFolders(parentId);
+      setDriveFolders(folders);
+    } catch (error) {
+      console.error('Error loading folders:', error);
+    } finally {
+      setIsLoadingDrive(false);
+    }
+  };
+
   const loadDriveData = async () => {
     if (!driveService.isAuthenticated() || isLoadingDrive) return;
     setIsLoadingDrive(true);
     try {
-      // Intentamos cargar por separado para que uno no rompa al otro
-      const folders = await driveService.listFolders();
+      const currentParent = currentNavPath[currentNavPath.length - 1].id;
+      const folders = await driveService.listFolders(currentParent);
       setDriveFolders(folders);
 
       const backups = await driveService.listBackups(store.driveFolderId);
@@ -76,7 +90,8 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
     
     setIsLoadingDrive(true);
     try {
-      const folderId = await driveService.createFolder(name);
+      const currentParent = currentNavPath[currentNavPath.length - 1].id;
+      const folderId = await driveService.createFolder(name, currentParent);
       store.setDriveSettings(folderId, name, store.isAutoSyncEnabled);
       await loadDriveData();
       setIsShowingFolderPicker(false);
@@ -366,44 +381,69 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
               {isShowingFolderPicker && (
                 <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Tus carpetas en Drive</span>
-                    <button 
-                      onClick={handleCreateFolder}
-                      className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" /> Nueva
-                    </button>
+                    <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest truncate max-w-[150px]">
+                      {currentNavPath[currentNavPath.length - 1].name}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {currentNavPath.length > 1 && (
+                        <button 
+                          onClick={() => {
+                            const newPath = currentNavPath.slice(0, -1);
+                            setCurrentNavPath(newPath);
+                            loadFolders(newPath[newPath.length - 1].id);
+                          }}
+                          className="text-[9px] font-black text-slate-400 hover:text-white uppercase tracking-widest"
+                        >
+                          Atrás
+                        </button>
+                      )}
+                      <button 
+                        onClick={handleCreateFolder}
+                        className="text-[9px] font-black text-emerald-500 hover:text-emerald-400 uppercase tracking-widest flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Nueva
+                      </button>
+                    </div>
                   </div>
                   <div className="max-h-40 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                     {driveFolders.length === 0 ? (
                       <div className="py-4 px-2 text-center">
-                        <p className="text-[10px] text-slate-500 italic mb-2">No se encontraron carpetas en tu Google Drive</p>
-                        <button 
-                          onClick={handleCreateFolder}
-                          className="text-[9px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/20 px-3 py-1.5 rounded-lg hover:bg-blue-500/10 transition-all"
-                        >
-                          Crear carpeta ahora
-                        </button>
+                        <p className="text-[10px] text-slate-500 italic mb-2">Carpeta vacía</p>
                       </div>
                     ) : (
                       driveFolders.map(folder => (
-                        <button
+                        <div
                           key={folder.id}
-                          onClick={() => {
-                            store.setDriveSettings(folder.id, folder.name, store.isAutoSyncEnabled);
-                            setIsShowingFolderPicker(false);
-                            loadDriveData();
-                          }}
                           className={cn(
-                            "w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all truncate",
-                            store.driveFolderId === folder.id ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400 hover:bg-slate-800"
+                            "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all",
+                            store.driveFolderId === folder.id ? "bg-blue-600/30 border border-blue-600" : "bg-slate-900 border border-transparent hover:border-slate-700"
                           )}
                         >
-                          <div className="flex items-center gap-2 truncate">
-                            <FolderUp className="w-4 h-4 shrink-0 opacity-70" />
-                            <span className="truncate">{folder.name}</span>
-                          </div>
-                        </button>
+                          <button
+                            onClick={() => {
+                              const newPath = [...currentNavPath, { id: folder.id, name: folder.name }];
+                              setCurrentNavPath(newPath);
+                              loadFolders(folder.id);
+                            }}
+                            className="flex items-center gap-2 truncate flex-1 min-w-0"
+                          >
+                            <FolderUp className="w-4 h-4 shrink-0 text-blue-400" />
+                            <span className="text-xs font-bold text-slate-200 truncate">{folder.name}</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              store.setDriveSettings(folder.id, folder.name, store.isAutoSyncEnabled);
+                              setIsShowingFolderPicker(false);
+                              loadDriveData();
+                            }}
+                            className={cn(
+                              "text-[9px] font-black uppercase tracking-widest shrink-0 ml-2 px-2 py-1 rounded",
+                              store.driveFolderId === folder.id ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
+                            )}
+                          >
+                            {store.driveFolderId === folder.id ? 'Seleccionada' : 'Elegir'}
+                          </button>
+                        </div>
                       ))
                     )}
                   </div>
