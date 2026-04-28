@@ -76,9 +76,9 @@ export class GoogleDriveService {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
     
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       this.handleUnauthorized();
-      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
+      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar con Google.');
     }
 
     if (!response.ok) {
@@ -104,9 +104,9 @@ export class GoogleDriveService {
       }),
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       this.handleUnauthorized();
-      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
+      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
@@ -135,9 +135,9 @@ export class GoogleDriveService {
       }
     );
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       this.handleUnauthorized();
-      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
+      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
@@ -177,9 +177,9 @@ export class GoogleDriveService {
       }
     );
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       this.handleUnauthorized();
-      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
+      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
@@ -203,9 +203,9 @@ export class GoogleDriveService {
       }
     );
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       this.handleUnauthorized();
-      throw new Error('Sesión de Google expirada. Por favor, vuelve a conectar.');
+      throw new Error('Permisos insuficientes o sesión expirada. Por favor, vuelve a conectar.');
     }
 
     if (!response.ok) {
