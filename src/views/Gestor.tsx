@@ -19,13 +19,23 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       setIsDriveAuth(true);
       loadDriveData();
     };
+
+    const handleExpired = () => {
+      setIsDriveAuth(false);
+      setDriveFiles([]);
+      setDriveFolders([]);
+    };
     
     if (driveService.isAuthenticated()) {
       handleAuth();
     }
     
     window.addEventListener('googledrive_auth_success', handleAuth);
-    return () => window.removeEventListener('googledrive_auth_success', handleAuth);
+    window.addEventListener('googledrive_auth_expired', handleExpired);
+    return () => {
+      window.removeEventListener('googledrive_auth_success', handleAuth);
+      window.removeEventListener('googledrive_auth_expired', handleExpired);
+    };
   }, []);
 
   const loadDriveData = async () => {

@@ -5,7 +5,7 @@ declare global {
   }
 }
 
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const SCOPES = 'https://www.googleapis.com/auth/drive';
 
 export interface GoogleDriveFile {
   id: string;
@@ -18,7 +18,7 @@ export class GoogleDriveService {
   private tokenClient: any = null;
 
   constructor(private clientId: string) {
-    this.accessToken = sessionStorage.getItem('gd_access_token');
+    this.accessToken = localStorage.getItem('gd_access_token');
   }
 
   init() {
@@ -35,7 +35,7 @@ export class GoogleDriveService {
                 return;
               }
               this.accessToken = response.access_token;
-              sessionStorage.setItem('gd_access_token', response.access_token);
+              localStorage.setItem('gd_access_token', response.access_token);
               window.dispatchEvent(new CustomEvent('googledrive_auth_success'));
             },
           });
@@ -57,22 +57,33 @@ export class GoogleDriveService {
 
   logout() {
     this.accessToken = null;
-    sessionStorage.removeItem('gd_access_token');
+    localStorage.removeItem('gd_access_token');
   }
 
   isAuthenticated() {
     return !!this.accessToken;
   }
 
+  private handleUnauthorized() {
+    this.logout();
+    window.dispatchEvent(new CustomEvent('googledrive_auth_expired'));
+  }
+
   async listFolders(): Promise<GoogleDriveFile[]> {
     if (!this.accessToken) throw new Error('Not authenticated');
-    const q = encodeURIComponent("mimeType = 'application/vnd.google-apps.folder' and trashed = false");
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id, name, modifiedTime)`, {
+    const q = "mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=name`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     });
+    
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Session expired');
+    }
+
     if (!response.ok) throw new Error('Failed to list folders');
     const data = await response.json();
-    return data.files;
+    return data.files || [];
   }
 
   async createFolder(name: string): Promise<string> {
@@ -88,6 +99,12 @@ export class GoogleDriveService {
         mimeType: 'application/vnd.google-apps.folder',
       }),
     });
+
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Session expired');
+    }
+
     if (!response.ok) throw new Error('Failed to create folder');
     const data = await response.json();
     return data.id;
@@ -102,13 +119,18 @@ export class GoogleDriveService {
     }
 
     const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&orderBy=modifiedTime desc`,
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name, modifiedTime)&pageSize=1000&orderBy=modifiedTime desc`,
       {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
         },
       }
     );
+
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Session expired');
+    }
 
     if (!response.ok) {
       throw new Error('Failed to list backups');
@@ -145,6 +167,11 @@ export class GoogleDriveService {
       }
     );
 
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Session expired');
+    }
+
     if (!response.ok) {
       throw new Error('Failed to upload backup');
     }
@@ -163,6 +190,11 @@ export class GoogleDriveService {
         },
       }
     );
+
+    if (response.status === 401) {
+      this.handleUnauthorized();
+      throw new Error('Session expired');
+    }
 
     if (!response.ok) {
       throw new Error('Failed to download backup');
