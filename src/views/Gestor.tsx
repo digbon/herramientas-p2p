@@ -156,6 +156,7 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
       if (importedData) {
         store.importData(importedData);
         alert('¡Copia de seguridad restaurada con éxito!');
+        window.location.reload();
       }
     } catch (error: any) {
       console.error('Error in cloud restore:', error);
@@ -229,6 +230,7 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
         if (importedData) {
           store.importData(importedData);
           alert('¡Copia de seguridad restaurada con éxito!');
+          window.location.reload();
         }
       }
     } catch (error) {
@@ -397,7 +399,10 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
                             store.driveFolderId === folder.id ? "bg-blue-600 text-white" : "bg-slate-900 text-slate-400 hover:bg-slate-800"
                           )}
                         >
-                          {folder.name}
+                          <div className="flex items-center gap-2 truncate">
+                            <FolderUp className="w-4 h-4 shrink-0 opacity-70" />
+                            <span className="truncate">{folder.name}</span>
+                          </div>
                         </button>
                       ))
                     )}
@@ -462,10 +467,13 @@ export function Gestor({ onNavigate }: { onNavigate?: (view: string) => void }) 
                   </div>
                 ) : (
                   driveFiles.map(file => (
-                    <div key={file.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between group hover:border-slate-700 transition-colors">
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-200 truncate pr-2">{file.name}</span>
-                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{new Date(file.modifiedTime).toLocaleString()}</span>
+                    <div key={file.id} className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3 group hover:border-slate-700 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Archive className="w-5 h-5 text-blue-400 shrink-0" />
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-xs font-bold text-slate-200 truncate pr-2">{file.name}</span>
+                          <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{new Date(file.modifiedTime).toLocaleString()}</span>
+                        </div>
                       </div>
                       <button 
                         onClick={() => handleCloudRestore(file.id)}
