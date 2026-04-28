@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore, PaymentMethod } from '../store';
-import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Trash2, Wallet } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import { NewOperation } from './NewOperation';
@@ -106,17 +106,6 @@ export function History() {
                           <div className="text-[10px] text-slate-500 whitespace-nowrap">
                             {format(new Date(t.date), 'dd/MM/yy HH:mm')}
                           </div>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('¿Eliminar transferencia?')) {
-                                store.importData({ transfers: store.transfers.filter(tr => tr.id !== t.id) });
-                              }
-                            }}
-                            className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-center mb-3">
@@ -160,15 +149,6 @@ export function History() {
                           <div className="text-[10px] text-slate-500 whitespace-nowrap">
                             {format(new Date(op.date), 'dd/MM/yy HH:mm')}
                           </div>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('¿Eliminar operación?')) store.importData({ operations: store.operations.filter(o => o.id !== op.id) });
-                            }}
-                            className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-baseline mb-2">
@@ -213,17 +193,7 @@ export function History() {
                            <div className="text-[10px] text-slate-500 whitespace-nowrap">
                              {format(new Date(m.date), 'dd/MM/yy HH:mm')}
                            </div>
-                           <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirm(`¿Eliminar ${m.type === 'Deposit' ? 'depósito' : 'retiro'}?`)) {
-                                  store.importData({ movements: store.movements.filter(mov => mov.id !== m.id) });
-                                }
-                              }}
-                              className="p-1.5 hover:bg-red-500/10 text-slate-600 hover:text-red-500 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                           
                          </div>
                        </div>
                        <div className="flex justify-between items-baseline mb-2">
