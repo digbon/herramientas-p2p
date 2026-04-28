@@ -20,7 +20,8 @@ export function OwnerNameInputPicker({
 
   // Derive unique names from paymentMethods
   const existingNames = Array.from(new Set([
-    ...store.paymentMethods.filter(pm => pm.ownerType === ownerType).map(p => p.ownerName)
+    ...store.paymentMethods.filter(pm => pm.ownerType === ownerType).map(p => p.ownerName),
+    ...(ownerType === 'Cliente' ? store.operations.map(op => op.clientName) : [])
   ])).filter(Boolean);
 
   const filteredNames = existingNames.filter(n => n.toLowerCase().includes(searchTerm.toLowerCase()));

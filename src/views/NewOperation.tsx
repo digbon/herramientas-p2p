@@ -279,12 +279,12 @@ export function NewOperation({ onClose }: { onClose: () => void }) {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1 relative">
                 <label className="text-xs text-slate-400">Plataforma P2P</label>
-                <OwnerNamePicker value={p2pPlatform} ownerType="Mias" placeholder="Ej: Binance, Airtm..." onSelect={(name) => setP2pPlatform(name)} />
+                <OwnerNamePicker value={p2pPlatform} pickerType="p2p" placeholder="Ej: Binance, Airtm..." onSelect={(name) => setP2pPlatform(name)} />
               </div>
               
               <div className="space-y-1 relative">
                 <label className="text-xs text-slate-400">Nombre completo del cliente <span className="text-red-500">*</span></label>
-                <OwnerNamePicker value={clientName} ownerType="Cliente" onSelect={(name) => setClientName(name)} />
+                <OwnerNamePicker value={clientName} pickerType="client" onSelect={(name) => setClientName(name)} />
               </div>
 
               <div className="sm:col-span-2 space-y-1 relative">

@@ -6,13 +6,13 @@ import { cn } from '../lib/utils';
 export function OwnerNamePicker({
   value,
   onSelect,
-  ownerType,
+  pickerType,
   disabled,
   placeholder
 }: {
   value: string;
   onSelect: (name: string, isNew?: boolean) => void;
-  ownerType: 'Mias' | 'Cliente';
+  pickerType: 'p2p' | 'client';
   disabled?: boolean;
   placeholder?: string;
 }) {
@@ -21,10 +21,10 @@ export function OwnerNamePicker({
   const [searchTerm, setSearchTerm] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Derive unique names from paymentMethods and operations
+  // Derive unique names based on pickerType
   const existingNames = Array.from(new Set([
-    ...store.paymentMethods.filter(p => p.ownerType === ownerType).map(p => p.ownerName),
-    ...(ownerType === 'Cliente' ? store.operations.map(op => op.clientName) : store.operations.map(op => op.p2pPlatform))
+    ...(pickerType === 'client' ? store.paymentMethods.filter(p => p.ownerType === 'Cliente').map(p => p.ownerName) : []),
+    ...(pickerType === 'client' ? store.operations.map(op => op.clientName) : store.operations.map(op => op.p2pPlatform))
   ])).filter(Boolean);
 
   const filteredNames = existingNames.filter(n => n.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -56,7 +56,7 @@ export function OwnerNamePicker({
           }}
           onFocus={() => setIsOpen(true)}
           disabled={disabled}
-          placeholder={placeholder || (ownerType === 'Cliente' ? "Nombre completo del cliente" : "Nombre")}
+          placeholder={placeholder || (pickerType === 'client' ? "Nombre completo del cliente" : "Nombre")}
           className={cn(
             "w-full bg-slate-950 border border-slate-800 rounded-lg pl-10 pr-3 py-3 text-white outline-none focus:border-blue-500 font-bold",
             disabled && "opacity-50 cursor-not-allowed"
@@ -104,7 +104,7 @@ export function OwnerNamePicker({
                 }
               }}
             >
-              {searchTerm ? `+ Agregar nuevo ${ownerType === 'Cliente' ? 'cliente' : 'propietario'}: "${searchTerm}"` : 'Escribe para buscar...'}
+              {searchTerm ? `+ Agregar nuev${pickerType === 'client' ? 'o cliente' : 'a plataforma'}: "${searchTerm}"` : 'Escribe para buscar...'}
             </div>
           )}
         </div>
