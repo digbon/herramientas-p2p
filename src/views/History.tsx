@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore, PaymentMethod } from '../store';
 import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { format } from 'date-fns';
+import { format, isSameDay, isSameWeek, isSameMonth, isSameYear } from 'date-fns';
 import { NewOperation } from './NewOperation';
 
 export function History() {
@@ -12,19 +12,43 @@ export function History() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
 
+  const filterByTimeAndSearch = (items: any[]) => {
+    const now = new Date();
+    return items.filter(item => {
+      const itemDate = new Date(item.date);
+      let timeMatch = true;
+      if (timeFilter === 'Día') timeMatch = isSameDay(itemDate, now);
+      else if (timeFilter === 'Semana') timeMatch = isSameWeek(itemDate, now);
+      else if (timeFilter === 'Mes') timeMatch = isSameMonth(itemDate, now);
+      else if (timeFilter === 'Año') timeMatch = isSameYear(itemDate, now);
+
+      let searchMatch = true;
+      if (search) {
+        const q = search.toLowerCase();
+        searchMatch = JSON.stringify(item).toLowerCase().includes(q);
+      }
+      return timeMatch && searchMatch;
+    });
+  };
+
+  const filteredOperations = filterByTimeAndSearch(store.operations);
+  const filteredDeposits = filterByTimeAndSearch(store.movements.filter(m => m.type === 'Deposit'));
+  const filteredWithdrawals = filterByTimeAndSearch(store.movements.filter(m => m.type === 'Withdrawal'));
+  const filteredTransfers = filterByTimeAndSearch(store.transfers);
+
   return (
     <div className="space-y-6 pb-16">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800">
         <h1 className="text-2xl font-black text-white tracking-tight">Historial</h1>
         
         <div className="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto">
-          <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-full p-1 w-full sm:w-auto">
-            {['Día', 'Semana', 'Mes', 'Global'].map((tab) => (
+          <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-full p-1 w-full sm:w-auto overflow-x-auto scrollbar-hide">
+            {['Día', 'Semana', 'Mes', 'Año', 'Global'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setTimeFilter(tab)}
                 className={cn(
-                  "flex-1 px-4 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-full transition-all",
+                  "flex-1 min-w-[70px] px-4 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-full transition-all",
                   timeFilter === tab ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-slate-300"
                 )}
               >
@@ -54,10 +78,10 @@ export function History() {
       <div>
         <div className="flex gap-4 border-b border-slate-800 overflow-x-auto whitespace-nowrap scrollbar-hide px-4">
            {['Operaciones', 'Depósitos', 'Retiros', 'Transferencias'].map((tab) => {
-            const count = tab === 'Operaciones' ? store.operations.length 
-              : tab === 'Depósitos' ? store.movements.filter(m => m.type === 'Deposit').length
-              : tab === 'Retiros' ? store.movements.filter(m => m.type === 'Withdrawal').length
-              : tab === 'Transferencias' ? store.transfers.length : 0;
+            const count = tab === 'Operaciones' ? filteredOperations.length 
+              : tab === 'Depósitos' ? filteredDeposits.length
+              : tab === 'Retiros' ? filteredWithdrawals.length
+              : tab === 'Transferencias' ? filteredTransfers.length : 0;
              
             return (
               <button
@@ -81,13 +105,13 @@ export function History() {
         </div>
         
         <div className="pt-8 text-center text-slate-500 text-sm">
-          {listTab === 'Operaciones' && store.operations.length === 0 && "No hay operaciones."}
-          {listTab === 'Depósitos' && store.movements.filter(m => m.type === 'Deposit').length === 0 && "No hay depósitos."}
-          {listTab === 'Retiros' && store.movements.filter(m => m.type === 'Withdrawal').length === 0 && "No hay retiros."}
-          {listTab === 'Transferencias' && store.transfers.length === 0 && "No hay transferencias."}
+          {listTab === 'Operaciones' && filteredOperations.length === 0 && "No hay operaciones."}
+          {listTab === 'Depósitos' && filteredDeposits.length === 0 && "No hay depósitos."}
+          {listTab === 'Retiros' && filteredWithdrawals.length === 0 && "No hay retiros."}
+          {listTab === 'Transferencias' && filteredTransfers.length === 0 && "No hay transferencias."}
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-             {listTab === 'Transferencias' && store.transfers.map(t => {
+             {listTab === 'Transferencias' && filteredTransfers.map(t => {
                 const sourcePM = store.paymentMethods.find(pm => pm.id === (t.sourcePaymentMethodId || (t as any).sourceAccountId));
                 const destPM = store.paymentMethods.find(pm => pm.id === (t.destPaymentMethodId || (t as any).destAccountId));
                 const currency = (t as any).currency || sourcePM?.currency || '';
@@ -131,7 +155,7 @@ export function History() {
                 );
              })}
 
-             {listTab === 'Operaciones' && store.operations.map(op => {
+             {listTab === 'Operaciones' && filteredOperations.map(op => {
                 const sMyPM = store.paymentMethods.find(pm => pm.id === (op.sourceMyPaymentMethodId || (op as any).sourceMyAccountId));
                 const sClientPM = store.paymentMethods.find(pm => pm.id === (op.sourceClientPaymentMethodId || (op as any).sourceClientAccountId));
                 const dMyPM = store.paymentMethods.find(pm => pm.id === (op.destMyPaymentMethodId || (op as any).destMyAccountId));
@@ -179,7 +203,7 @@ export function History() {
                 );
               })}
 
-              {(listTab === 'Depósitos' || listTab === 'Retiros') && store.movements.filter(m => m.type === (listTab === 'Depósitos' ? 'Deposit' : 'Withdrawal')).map(m => {
+              {(listTab === 'Depósitos' || listTab === 'Retiros') && (listTab === 'Depósitos' ? filteredDeposits : filteredWithdrawals).map(m => {
                  const pm = store.paymentMethods.find(p => p.id === (m.paymentMethodId || (m as any).accountId));
                  return (
                    <div key={m.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left flex items-start gap-3">
