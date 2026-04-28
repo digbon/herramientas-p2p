@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore, PaymentMethod } from '../store';
 import { Search, Plus, SlidersHorizontal, ArrowUpRight, ArrowDownRight, ArrowRightLeft, User, ChevronDown, Wallet, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { format, isSameDay, isSameWeek, isSameMonth, isSameYear, subDays, addDays, subWeeks, addWeeks, subMonths, addMonths, subYears, addYears } from 'date-fns';
+import { format, isSameDay, isSameWeek, isSameMonth, isSameYear, subDays, addDays, subWeeks, addWeeks, subMonths, addMonths, subYears, addYears, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { NewOperation } from './NewOperation';
 
@@ -48,7 +48,6 @@ export function History() {
 
   const getFormatString = () => {
     if (timeFilter === 'Día') return "dd 'de' MMMM, yyyy";
-    if (timeFilter === 'Semana') return "'Semana del' dd MMM, yyyy";
     if (timeFilter === 'Mes') return "MMMM yyyy";
     if (timeFilter === 'Año') return "yyyy";
     return "";
@@ -88,11 +87,24 @@ export function History() {
               <button onClick={handlePrevTime} className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <div className="flex items-center gap-2 px-2 flex-1 justify-center min-w-[140px]">
+              <div className="flex items-center gap-2 px-2 flex-1 justify-center min-w-[140px] relative group cursor-pointer">
                 <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
-                <span className="text-xs font-bold text-white capitalize whitespace-nowrap">
-                  {format(referenceDate, getFormatString(), { locale: es })}
+                <span className="text-xs font-bold text-white capitalize whitespace-nowrap group-hover:text-blue-400 transition-colors">
+                  {timeFilter === 'Semana' ? (
+                    `${format(startOfWeek(referenceDate, { weekStartsOn: 1 }), "dd MMM", {locale: es})} - ${format(endOfWeek(referenceDate, { weekStartsOn: 1 }), "dd MMM, yyyy", {locale: es})}`
+                  ) : format(referenceDate, getFormatString(), { locale: es })}
                 </span>
+                <input 
+                  type="date"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  value={format(referenceDate, 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      // Append time to avoid timezone issues
+                      setReferenceDate(new Date(e.target.value + 'T12:00:00'));
+                    }
+                  }}
+                />
               </div>
               <button onClick={handleNextTime} className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
                 <ChevronRight className="w-4 h-4" />
