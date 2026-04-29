@@ -14,15 +14,22 @@ import { format, subDays, parseISO, startOfDay } from 'date-fns';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { calculateProfitability, AccountingMethod, DailyAccountingData } from '../lib/accounting';
 
 const timeRanges = ['Día', 'Semana', 'Mes', 'Año', 'Global'] as const;
 type TimeRange = typeof timeRanges[number];
+
+const accountingMethods: AccountingMethod[] = ['AVG', 'FIFO', 'LOFO', 'HIFO'];
 
 export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const store = useAppStore();
   const [viewMode, setViewMode] = useState<'acumulada' | 'diaria'>('acumulada');
   const [timeRange, setTimeRange] = useState<TimeRange>('Mes');
   const [isTimeRangeOpen, setIsTimeRangeOpen] = useState(false);
+  
+  const [accountingMethod, setAccountingMethod] = useState<AccountingMethod>('AVG');
+  const [isAccountingOpen, setIsAccountingOpen] = useState(false);
+
   
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -50,7 +57,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
     .filter(c => c.symbol.toLowerCase().includes(currencySearchTerm.toLowerCase()));
 
   // Compute realistic or mock data based on operations and the selected currency
-  const { totalProfitBase, totalProfitSecondary, profitabilityPercentage, chartData, totalVolume, totalCommissions, recentOps, secondaryCurrencySymbol } = useMemo(() => {
+  const { totalProfitBase, profitabilityPercentage, chartData, totalVolume, totalCommissions, recentOps, secondaryCurrencySymbol } = useMemo(() => {
     // Filter operations that involve the selected currency
     const allOpsForCurrency = store.operations.filter(op => op.sourceCurrency === selectedCurrency || op.destCurrency === selectedCurrency);
     
@@ -62,6 +69,9 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
     });
     const secondaryCurrencySymbol = Object.keys(counterpartCounts).sort((a,b) => counterpartCounts[b] - counterpartCounts[a])[0] || store.baseFiat;
 
+    // Calculate all data using the accounting logic
+    const { dailyData, totalCommsBase, totalVolumeBase } = calculateProfitability(store.operations, selectedCurrency, accountingMethod);
+
     const daysLimit = timeRange === 'Día' ? 1 
                     : timeRange === 'Semana' ? 7 
                     : timeRange === 'Mes' ? 30 
@@ -69,15 +79,16 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
                     : Infinity;
 
     const now = new Date();
-    const ops = allOpsForCurrency.filter(op => {
+    
+    // Recent Ops Filter
+    const recentOpsTimeFiltered = allOpsForCurrency.filter(op => {
        if (daysLimit === Infinity) return true;
        return (now.getTime() - new Date(op.date).getTime()) <= daysLimit * 24 * 60 * 60 * 1000;
     });
 
-    if (ops.length === 0) {
+    if (recentOpsTimeFiltered.length === 0 && Object.keys(dailyData).length === 0) {
       return {
         totalProfitBase: 0,
-        totalProfitSecondary: 0,
         profitabilityPercentage: 0,
         chartData: Array.from({length: Math.min(daysLimit === Infinity ? 6 : daysLimit, 6)}).map((_, i) => ({
           date: format(subDays(new Date(), 5 - i), 'd/M'),
@@ -96,79 +107,74 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
       };
     }
 
-    // Sort ops oldest to newest
-    const sortedOps = [...ops].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    // Group operations by Day
-    const dailyData: Record<string, { baseAmount: number, secAmount: number, profitBase: number, profitSec: number, comms: number }> = {};
-    let totalVol = 0;
-    let totalComms = 0;
-
-    sortedOps.forEach(op => {
-       const isSellingBase = op.sourceCurrency === selectedCurrency;
-       const baseAmount = isSellingBase ? op.amountInvested : op.amountReceived;
-       const secAmount = isSellingBase ? op.amountReceived : op.amountInvested;
-       
-       const opComms = op.commissions.reduce((acc, c) => acc + (c.type === 'fixed' ? c.value : baseAmount * (c.value/100)), 0);
-       totalComms += opComms;
-       totalVol += baseAmount;
-       
-       const profitAddedBase = isSellingBase ? (baseAmount * 0.02) : (baseAmount * 0.005); 
-       const profitAddedSec = isSellingBase ? (secAmount * 0.02) : (secAmount * 0.005);
-
-       const dateKey = format(parseISO(op.date), 'yyyy-MM-dd');
-       if(!dailyData[dateKey]) {
-          dailyData[dateKey] = { baseAmount: 0, secAmount: 0, profitBase: 0, profitSec: 0, comms: 0 };
-       }
-       dailyData[dateKey].baseAmount += baseAmount;
-       dailyData[dateKey].secAmount += secAmount;
-       dailyData[dateKey].profitBase += profitAddedBase;
-       dailyData[dateKey].profitSec += profitAddedSec;
-       dailyData[dateKey].comms += opComms;
-    });
-
     const sortedDays = Object.keys(dailyData).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
     
+    // Calculate global cumulative progressively up to now
+    let cData: any[] = [];
     let baseProgression = 0;
     let secProgression = 0;
     let progressionVol = 0;
+    
+    let totalVolInRange = 0;
+    let totalCommsInRange = 0;
+    let baseProgressionStart = 0;
+    let progressionVolStart = 0;
 
-    const cData = sortedDays.map(dayStr => {
+    sortedDays.forEach(dayStr => {
         const d = dailyData[dayStr];
-        baseProgression += d.profitBase;
-        secProgression += d.profitSec;
-        progressionVol += d.baseAmount;
+        const dayTime = parseISO(dayStr).getTime();
         
-        return {
-           date: format(parseISO(dayStr), 'd/M'),
-           fullDate: format(parseISO(dayStr), 'dd/MM/yyyy'),
-           valueAcumulada: baseProgression,
-           valueDiaria: d.profitBase,
-           baseVol: d.baseAmount,
-           secVol: d.secAmount,
-           percentageAcumulada: ((baseProgression / (progressionVol || 1)) * 100).toFixed(2),
-           percentageDiaria: ((d.profitBase / (d.baseAmount || 1)) * 100).toFixed(2),
-        };
+        const isInRange = daysLimit === Infinity ? true : (now.getTime() - dayTime) <= daysLimit * 24 * 60 * 60 * 1000;
+
+        if (!isInRange) {
+          // just accumulate
+          baseProgression += d.profitBase;
+          progressionVol += d.volumeBase;
+          baseProgressionStart = baseProgression;
+          progressionVolStart = progressionVol;
+        } else {
+          baseProgression += d.profitBase;
+          progressionVol += d.volumeBase;
+          totalVolInRange += d.volumeBase;
+          totalCommsInRange += d.commsBase;
+          
+          cData.push({
+             date: format(parseISO(dayStr), 'd/M'),
+             fullDate: format(parseISO(dayStr), 'dd/MM/yyyy'),
+             valueAcumulada: baseProgression,  // Should it show progression from zero for the period, or global?
+             // Lets show global for now in the chart tooltips, but the bottom label is baseProgression - baseProgressionStart
+             valueAcumuladaPeriodo: baseProgression - baseProgressionStart,
+             valueDiaria: d.profitBase,
+             baseVol: d.volumeBase,
+             secVol: d.volumeAsset,
+             percentageAcumulada: ((baseProgression / (progressionVol || 1)) * 100).toFixed(2),
+             percentageDiaria: ((d.profitBase / (d.volumeBase || 1)) * 100).toFixed(2),
+          });
+        }
     });
 
+    const finalProfitBasePeriod = baseProgression - baseProgressionStart;
+    
+    // Sort ops oldest to newest for the list
+    const sortedOps = [...recentOpsTimeFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     return {
-      totalProfitBase: baseProgression,
-      totalProfitSecondary: secProgression,
-      profitabilityPercentage: cData.length ? parseFloat(cData[cData.length-1].percentageAcumulada) : 0,
+      totalProfitBase: finalProfitBasePeriod,
+      profitabilityPercentage: cData.length ? parseFloat(cData[cData.length-1].percentageAcumulada) : 0, // Using global percentage
       chartData: cData,
-      totalVolume: totalVol,
-      totalCommissions: totalComms,
+      totalVolume: totalVolInRange,
+      totalCommissions: totalCommsInRange,
       recentOps: [...sortedOps].reverse().slice(0, 5),
       secondaryCurrencySymbol
     };
 
-  }, [store.operations, selectedCurrency, store.baseFiat, timeRange]);
+  }, [store.operations, selectedCurrency, accountingMethod, timeRange]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       const isDiaria = viewMode === 'diaria';
-      const val = isDiaria ? data.valueDiaria : data.valueAcumulada;
+      const val = isDiaria ? data.valueDiaria : data.valueAcumuladaPeriodo;
       const perc = isDiaria ? data.percentageDiaria : data.percentageAcumulada;
 
       return (
@@ -278,38 +284,74 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
                <span>{viewMode === 'acumulada' ? 'Vista Acumulada' : 'Vista Diaria Detallada'}</span>
              </div>
              
-             {/* Time Range Selector */}
-             <div className="relative z-40">
-               <button 
-                 onClick={() => setIsTimeRangeOpen(!isTimeRangeOpen)}
-                 className="flex items-center gap-1.5 bg-[#1a2235] hover:bg-slate-800 transition-colors border border-white/5 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg font-bold"
-               >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span className="leading-none text-left min-w-[3rem]">{timeRange}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-500" />
-               </button>
-               {isTimeRangeOpen && (
-                 <>
-                   <div className="fixed inset-0" onClick={() => setIsTimeRangeOpen(false)} />
-                   <div className="absolute right-0 top-full mt-2 w-32 bg-[#1a2235] border border-white/10 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
-                     {timeRanges.map(range => (
-                       <button
-                         key={range}
-                         onClick={() => {
-                           setTimeRange(range);
-                           setIsTimeRangeOpen(false);
-                         }}
-                         className={cn(
-                           "w-full text-left px-4 py-2 text-xs font-bold transition-colors",
-                           timeRange === range ? "bg-blue-600/20 text-blue-400" : "hover:bg-white/5 text-slate-300"
-                         )}
-                       >
-                         {range}
-                       </button>
-                     ))}
-                   </div>
-                 </>
-               )}
+             {/* Selectors */}
+             <div className="flex items-center gap-2 relative z-40">
+               {/* Accounting Method Selector */}
+               <div className="relative">
+                 <button 
+                   onClick={() => setIsAccountingOpen(!isAccountingOpen)}
+                   className="flex items-center gap-1.5 bg-[#1a2235] hover:bg-slate-800 transition-colors border border-white/5 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg font-bold"
+                 >
+                    <span className="leading-none">{accountingMethod}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-500" />
+                 </button>
+                 {isAccountingOpen && (
+                   <>
+                     <div className="fixed inset-0" onClick={() => setIsAccountingOpen(false)} />
+                     <div className="absolute right-0 top-full mt-2 w-24 bg-[#1a2235] border border-white/10 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                       {accountingMethods.map(method => (
+                         <button
+                           key={method}
+                           onClick={() => {
+                             setAccountingMethod(method);
+                             setIsAccountingOpen(false);
+                           }}
+                           className={cn(
+                             "w-full text-left px-4 py-2 text-xs font-bold transition-colors",
+                             accountingMethod === method ? "bg-blue-600/20 text-blue-400" : "hover:bg-white/5 text-slate-300"
+                           )}
+                         >
+                           {method}
+                         </button>
+                       ))}
+                     </div>
+                   </>
+                 )}
+               </div>
+
+               {/* Time Range Selector */}
+               <div className="relative">
+                 <button 
+                   onClick={() => setIsTimeRangeOpen(!isTimeRangeOpen)}
+                   className="flex items-center gap-1.5 bg-[#1a2235] hover:bg-slate-800 transition-colors border border-white/5 text-slate-300 text-[10px] px-2.5 py-1.5 rounded-lg font-bold"
+                 >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span className="leading-none text-left min-w-[3rem]">{timeRange}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-500" />
+                 </button>
+                 {isTimeRangeOpen && (
+                   <>
+                     <div className="fixed inset-0" onClick={() => setIsTimeRangeOpen(false)} />
+                     <div className="absolute right-0 top-full mt-2 w-32 bg-[#1a2235] border border-white/10 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+                       {timeRanges.map(range => (
+                         <button
+                           key={range}
+                           onClick={() => {
+                             setTimeRange(range);
+                             setIsTimeRangeOpen(false);
+                           }}
+                           className={cn(
+                             "w-full text-left px-4 py-2 text-xs font-bold transition-colors",
+                             timeRange === range ? "bg-blue-600/20 text-blue-400" : "hover:bg-white/5 text-slate-300"
+                           )}
+                         >
+                           {range}
+                         </button>
+                       ))}
+                     </div>
+                   </>
+                 )}
+               </div>
              </div>
           </div>
 
@@ -368,7 +410,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
                       <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#64748b', strokeWidth: 1, strokeDasharray: '4 4' }} />
                       <Area 
                         type="stepAfter" 
-                        dataKey="valueAcumulada" 
+                        dataKey="valueAcumuladaPeriodo" 
                         stroke="#10b981" 
                         strokeWidth={3}
                         fillOpacity={1} 
